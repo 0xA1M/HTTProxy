@@ -15,13 +15,14 @@ This project aims to create a lightweight and scalable HTTP/HTTPS proxy server i
 - [ ] **Compression Support**: Implement support for major compression/decompression (gzip/deflate/br) standards in HTTP requests and responses.
 - [ ] **HTTPS Support**: Implement SSL/TLS tunneling for HTTPS traffic using the `CONNECT` method.
 - [ ] **Logging**: Track requests, responses, errors, and connection details for monitoring and debugging via [clog](https://github.com/0xA1M/clog).
-- [ ] **Text-Based User Interface (TUI)**: Real-time console for monitoring server activity and logs.
 - [ ] **Request Throttling**: Limit client request rates to prevent abuse and ensure resource fairness.
 - [ ] **Load Balancing**: Distribute traffic across multiple servers for better performance and reliability.
 - [ ] **Timeout Management**: Handle connection/request timeouts to prevent resource waste (10 seconds timeout).
+
+### Quality of life features
+- [ ] **Text-Based User Interface (TUI)**: Real-time console for monitoring server activity and logs.
 - [ ] **Caching**: Store responses for faster retrieval of frequently accessed content.
 - [ ] **Web filtering**: Implement a feature to block access to specified websites.
-- [ ] **Configuration**: Support configuration files for easy setup and customization.
 
 ## Installation
 

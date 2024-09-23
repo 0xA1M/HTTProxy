@@ -1,16 +1,12 @@
 #ifndef HANDLER_H
 #define HANDLER_H
 
-/* Standard Libraries */
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
+/* POSIX Multiplexing Library */
+#include <sys/poll.h>
 
-/* Networking Libraries */
-#include <netdb.h>
+#define TIMEOUT -1
 
-/* Logging Library */
-#include "clog.h"
+int client_handler(const int client_fd, int *server_fd, struct pollfd fds[2]);
 
 void *handler(void *arg);
 

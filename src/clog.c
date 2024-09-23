@@ -99,9 +99,9 @@ void log_message(log_level_t level, const char *custom_err, const char *file,
   if (level == ERR) {
     if (custom_err)
       printf(": %s", custom_err);
-    else
+    else if (err_code != 0)
       printf(": %s", strerror(err_code));
-  } else if (level == WARN) {
+  } else if (level == WARN && err_code != 0) {
     printf(": %s", strerror(err_code));
   }
 

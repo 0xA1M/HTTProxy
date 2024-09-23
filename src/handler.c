@@ -1,28 +1,5 @@
-#include <sys/poll.h>
-
 #include "handler.h"
-
-#define TIMEOUT -1
-#define MAX_HTTP_LEN 8192
-
-static int client_handler(const int client_fd, int *server_fd,
-                          struct pollfd fds[2]) {
-  char buffer[MAX_HTTP_LEN] = {0};
-  ssize_t bytes_recv = recv(client_fd, buffer, MAX_HTTP_LEN - 1, 0);
-  if (bytes_recv <= 0) {
-    if (bytes_recv == -1)
-      LOG(ERR, NULL, "Failed to receive from client");
-
-    if (bytes_recv == 0)
-      LOG(INFO, NULL, "Client closed the connection!");
-
-    return -1;
-  }
-
-  LOG(DBG, NULL, "Received from client %s", buffer);
-
-  return 0;
-}
+#include "common.h"
 
 void *handler(void *arg) {
   int client_fd = *((int *)arg);
@@ -54,12 +31,14 @@ void *handler(void *arg) {
         break;
 
     if (server_fd != -1 && (fds[1].revents & POLLIN))
-      LOG(INFO, NULL, "RECV FROM SERVER");
+      LOG(INFO, NULL, "No server yet -_-");
   }
 
   if (server_fd != -1)
     close(server_fd);
   close(client_fd);
+
+  remove_thread(pthread_self());
 
   return NULL;
 }

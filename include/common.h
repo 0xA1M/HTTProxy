@@ -17,6 +17,9 @@
 /* Logging Library */
 #include "clog.h"
 
+/* Parser */
+#include "parser.h"
+
 /* Thread Pool */
 #define MAX_THREADS 64 // Handle 64 simultaneous connections
 
@@ -31,6 +34,10 @@ int find_empty_slot(void);
 
 void remove_thread(pthread_t tid);
 
-int forward(const int dest_fd, const unsigned char *buffer, const ssize_t len);
+int forward(const int dest_fd, const unsigned char *buffer, const long len);
+
+void print_req(Request *req);
+
+void free_req(Request *req);
 
 #endif /* COMMON_H */

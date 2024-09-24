@@ -75,11 +75,6 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-  char cmd[128] = {0};
-  scanf("%127s", cmd);
-  if (strncmp("exit", cmd, 4) == 0)
-    stop_exec(0);
-
   pthread_join(thread_pool[0], NULL);
   return EXIT_SUCCESS;
 }

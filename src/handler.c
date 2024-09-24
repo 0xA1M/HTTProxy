@@ -13,6 +13,13 @@ void *handler(void *arg) {
   fds[1].fd = server_fd;
   fds[1].events = POLLIN;
 
+  Request *req = (Request *)malloc(sizeof(Request));
+  if (req == NULL) {
+    LOG(ERR, NULL, "Failed to allocate memory to request struct");
+    return NULL;
+  }
+  memset(req, 0, sizeof(Request));
+
   while (1) {
     int nfds = server_fd != -1 ? 2 : 1;
     int events = poll(fds, nfds, TIMEOUT);
@@ -27,7 +34,7 @@ void *handler(void *arg) {
     }
 
     if (fds[0].revents & POLLIN)
-      if (client_handler(client_fd, &server_fd, fds) == -1)
+      if (client_handler(client_fd, &server_fd, fds, req) == -1)
         break;
 
     if (server_fd != -1 && (fds[1].revents & POLLIN))

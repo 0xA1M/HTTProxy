@@ -40,4 +40,7 @@ void print_req(Request *req);
 
 void free_req(Request *req);
 
+char *get_header_value(char *target, const Header *headers,
+                       const size_t headers_count);
+
 #endif /* COMMON_H */

@@ -1,8 +1,53 @@
 #include "parser.h"
 #include "common.h"
 
+static char *normalize_uri(const char *uri, const long uri_len,
+                           const char *method) {
+  bool is_options = strncmp("OPTIONS", method, 7) == 0;
+  if (uri == NULL || is_options) {
+    if (is_options)
+      return strndup("*", 1);
+    return strndup("/", 1);
+  }
+
+  const char *path = (char *)memmem(uri, uri_len, "://", 3);
+  if (path != NULL) {
+    path += 3; // Skip past the scheme (http:// or https://)
+    path = (char *)memchr(path, '/', uri_len - (path - uri)); // Skip the domain
+    if (path == NULL)
+      return strndup("/", 1); // No path found, assume root
+  } else {
+    path = uri; // If there's no scheme, assume it's already a relative URI
+  }
+
+  // If the URI is malformed or empty, default to "/"
+  if (path == NULL || *path == '\0')
+    return strdup("/");
+
+  // Look for fragments ('#') and ignore everything after it
+  char *frag = (char *)memchr(path, '#', uri_len - (path - uri));
+  long path_len = strlen(path);
+  if (frag != NULL)
+    path_len = frag - path;
+
+  char *normalized_path = (char *)malloc(path_len + 1);
+  if (normalized_path == NULL) {
+    LOG(ERR, NULL, "Failed to allocate memory for normalized path");
+    return NULL;
+  }
+
+  // Copy the path and null-terminate it
+  memcpy(normalized_path, path, path_len);
+  normalized_path[path_len] = '\0';
+
+  return normalized_path;
+}
+
 static unsigned char *parse_request_line(const unsigned char *raw,
                                          Request *req) {
+  if (raw == NULL || req == NULL)
+    return NULL;
+
   unsigned char *method_end =
       (unsigned char *)memchr(raw, ' ', req->header_size);
   long method_size = method_end - raw;
@@ -10,7 +55,6 @@ static unsigned char *parse_request_line(const unsigned char *raw,
   req->method = (char *)malloc(method_size + 1);
   if (req->method == NULL) {
     LOG(ERR, NULL, "Failed to allocate memory to store method");
-    free_req(req);
     return NULL;
   }
   memset(req->method, 0, method_size);
@@ -23,15 +67,22 @@ static unsigned char *parse_request_line(const unsigned char *raw,
       method_end, ' ', req->header_size - (method_size + 1));
   long uri_size = uri_end - method_end;
 
-  req->uri = (char *)malloc(uri_size + 1);
-  if (req->uri == NULL) {
+  char *raw_uri = (char *)malloc(uri_size + 1);
+  if (raw_uri == NULL) {
     LOG(ERR, NULL, "Failed to allocate memory to store URI");
-    free_req(req);
     return NULL;
   }
-  memset(req->uri, 0, uri_size);
-  memcpy(req->uri, method_end, uri_size);
-  req->uri[uri_size] = '\0';
+  memset(raw_uri, 0, uri_size);
+  memcpy(raw_uri, method_end, uri_size);
+  raw_uri[uri_size] = '\0';
+
+  // Normalize the URI
+  req->uri = normalize_uri(raw_uri, uri_size, req->method);
+  if (req->uri == NULL) {
+    free(raw_uri);
+    return NULL;
+  }
+  free(raw_uri);
 
   uri_end += 1; // Skip past the SP
 
@@ -42,14 +93,13 @@ static unsigned char *parse_request_line(const unsigned char *raw,
   req->version = (char *)malloc(version_size + 1);
   if (req->version == NULL) {
     LOG(ERR, NULL, "Failed to allocate memory to store HTTP version");
-    free_req(req);
     return NULL;
   }
   memset(req->version, 0, version_size);
   memcpy(req->version, uri_end, version_size);
   req->version[version_size] = '\0';
 
-  return version_end + 2; // SKip past the \r\n
+  return version_end + 2; // Skip past the \r\n, the beginning of the headers
 }
 
 static int init_header_key(const unsigned char *key, const long key_len,
@@ -57,7 +107,6 @@ static int init_header_key(const unsigned char *key, const long key_len,
   req->headers[req->headers_count].key = (char *)malloc(key_len + 1);
   if (req->headers[req->headers_count].key == NULL) {
     LOG(ERR, NULL, "Failed to allocate memory to store key field of a header");
-    free_req(req);
     return -1;
   }
   memset(req->headers[req->headers_count].key, 0, key_len);
@@ -72,7 +121,6 @@ static int init_header_value(const unsigned char *value, const long value_len,
   if (req->headers[req->headers_count].value == NULL) {
     LOG(ERR, NULL,
         "Failed to allocate memory to store value field of a header");
-    free_req(req);
     return -1;
   }
   memset(req->headers[req->headers_count].value, 0, value_len);
@@ -94,7 +142,7 @@ static unsigned char *parse_headers(unsigned char *line,
     // Calculate it's length
     long header_len = next_line - line;
     if (header_len == 0)
-      break; // Reached a CRLF, marking the end of the headers
+      break; // Reached the last CRLF, marking the end of the headers
 
     unsigned char *delim = memchr(line, ':', header_len);
     if (delim != NULL) {
@@ -116,15 +164,6 @@ static unsigned char *parse_headers(unsigned char *line,
   return line + 2; // Skip the last CRLF
 }
 
-static char *get_header_value(char *target, const Header *headers,
-                              const size_t headers_count) {
-  for (size_t i = 0; i < headers_count; i++)
-    if (memcmp(target, headers[i].key, strlen(target)) == 0)
-      return headers[i].value;
-
-  return NULL;
-}
-
 static int parse_body(const unsigned char *body, Request *req) {
   // According to RFC 9110 a request message has an optional message body if
   // one of the following conditions is met:
@@ -135,10 +174,15 @@ static int parse_body(const unsigned char *body, Request *req) {
       get_header_value("Content-Length", req->headers, req->headers_count);
   if (content_length_str != NULL) {
     int content_length = strtol(content_length_str, NULL, 10);
+    if (content_length == 0) {
+      req->body = NULL;
+      req->body_size = 0;
+      return 0;
+    }
+
     req->body = (unsigned char *)malloc(content_length + 1);
     if (req->body == NULL) {
       LOG(ERR, NULL, "Failed to allocate memory to store request body");
-      free(req);
       return -1;
     }
     memset(req->body, 0, content_length);
@@ -149,11 +193,13 @@ static int parse_body(const unsigned char *body, Request *req) {
 
   char *transfer_encoding =
       get_header_value("Transfer-Encoding", req->headers, req->headers_count);
-  if (transfer_encoding != NULL) {
+  if (transfer_encoding != NULL &&
+      memcmp("chunked", transfer_encoding, 7) == 0) {
     // TODO
   }
 
   req->body = NULL;
+  req->body_size = 0;
   return 0;
 }
 
@@ -165,7 +211,6 @@ int parse_request(const unsigned char *raw, const long len, Request *req) {
   if (headers_end == NULL) {
     // TODO: Return a Invalid Request page
     LOG(ERR, NULL, "Invalid Request");
-    free_req(req);
     return -1;
   }
   // Move the headers_end past the last '\r\n\r\n'.

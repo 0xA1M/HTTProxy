@@ -2,10 +2,10 @@
 CC = gcc
 
 # Compiler flags
-CFLAGS = -Wall -Wextra -pedantic -Iinclude
+CFLAGS = -Wall -Wextra -pedantic -Iinclude -g
 
 # Linker flags
-LDFLAGS = -lncurses -lz -lbrotlienc -lbrotlidec
+LDFLAGS = -lncurses -lz -lbrotlienc -lbrotlidec -fsanitize=address
 
 # Directories
 SRC_DIR = src

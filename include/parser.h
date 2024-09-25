@@ -32,8 +32,4 @@ typedef struct Request {
 
 int parse_request(const unsigned char *raw, const long len, Request *req);
 
-void print_req(Request *req);
-
-void free_req(Request *req);
-
 #endif /* PARSER_H */

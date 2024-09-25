@@ -98,3 +98,12 @@ void print_req(Request *req) {
 
   printf(STYLE_DIM "\n####################################\n\n" STYLE_NO_DIM);
 }
+
+char *get_header_value(char *target, const Header *headers,
+                       const size_t headers_count) {
+  for (size_t i = 0; i < headers_count; i++)
+    if (strncmp(target, headers[i].key, strlen(target)) == 0)
+      return headers[i].value;
+
+  return NULL;
+}

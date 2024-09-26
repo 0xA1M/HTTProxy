@@ -63,30 +63,19 @@ int forward(const int dest_fd, const unsigned char *buffer, const long len) {
 
 /* Parser Shit */
 void free_req(Request *req) {
-  if (req == NULL) {
-    LOG(INFO, NULL, "Request empty. Nothing to free");
-    return;
-  }
-
   // Free the request line
-  if (req->method != NULL)
-    free(req->method);
-  if (req->uri != NULL)
-    free(req->uri);
-  if (req->version != NULL)
-    free(req->version);
+  free(req->method);
+  free(req->uri);
+  free(req->version);
 
   // Free the headers
   for (size_t i = 0; i < req->headers_count; i++) {
-    if (req->headers[i].key != NULL)
-      free(req->headers[i].key);
-    if (req->headers[i].value != NULL)
-      free(req->headers[i].value);
+    free(req->headers[i].key);
+    free(req->headers[i].value);
   }
 
-  if (req->body != NULL)
-    free(req->body); // Free the body
-  free(req);         // Free the request struct
+  free(req->body); // Free the body
+  free(req);       // Free the request struct
 }
 
 void print_req(Request *req) {

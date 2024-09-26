@@ -9,32 +9,17 @@ static int connect_to_server(const char *host) {
     return -1;
   }
 
-  char *domain = (char *)malloc(strlen(host) + 1);
-  if (domain == NULL) {
-    LOG(ERR, NULL, "Failed to duplicate host");
-    return -1;
-  }
-  memset(domain, 0, strlen(host));
-  memmove(domain, host, strlen(host));
-  domain[strlen(host)] = '\0';
+  char *domain = NULL;
   char port[MAX_PORT_LEN] = "80"; // Default port for HTTP
 
-  char *delim = memchr(host, ':', strlen(host));
+  char *delim = strchr(host, ':');
   if (delim != NULL) {
-    long domain_len = delim - host;
-    long port_len = strlen(host) - (domain_len + 1);
-
-    domain = (char *)realloc(domain, domain_len + 1);
-    if (domain == NULL) {
-      LOG(ERR, NULL, "Failed to allocate memory to store the domain");
-      return -1;
-    }
-    memset(domain, 0, domain_len);
-    memcpy(domain, host, domain_len);
-    domain[domain_len] = '\0';
-
-    memcpy(port, delim + 1, port_len);
-    port[port_len] = '\0';
+    size_t domain_len = delim - host;
+    domain = strndup(host, domain_len);
+    strncpy(port, delim + 1, MAX_PORT_LEN - 1);
+    port[MAX_PORT_LEN - 1] = '\0';
+  } else {
+    domain = strdup(host);
   }
 
   struct addrinfo hints, *res, *p;
@@ -51,16 +36,15 @@ static int connect_to_server(const char *host) {
     return -1;
   }
 
-  free(domain);
-
   char ip[INET_ADDRSTRLEN] = {0};
   int server_fd = -1;
+
   for (p = res; p != NULL; p = p->ai_next) {
     // Convert IP to human-readable form
     struct sockaddr_in *ipv4 = (struct sockaddr_in *)p->ai_addr;
     inet_ntop(p->ai_family, &(ipv4->sin_addr), ip, sizeof ip);
 
-    LOG(INFO, NULL, "Attempting to establish a connection to %s(%s):%s", host,
+    LOG(INFO, NULL, "Attempting to establish a connection to %s(%s):%s", domain,
         ip, port);
 
     server_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
@@ -72,6 +56,7 @@ static int connect_to_server(const char *host) {
     if (connect(server_fd, p->ai_addr, p->ai_addrlen) == -1) {
       LOG(WARN, NULL, "Failed to connect to server");
       close(server_fd);
+      server_fd = -1;
       continue;
     }
 
@@ -79,6 +64,8 @@ static int connect_to_server(const char *host) {
   }
 
   freeaddrinfo(res);
+  free(domain);
+
   if (p == NULL) {
     LOG(ERR, NULL, "Failed to establish a connection to %s:%s", host, port);
     return -1;
@@ -103,8 +90,7 @@ int client_handler(const int client_fd, int *server_fd, struct pollfd fds[2],
   }
 
   if (*is_TLS && *server_fd != -1) {
-    LOG(DBG, NULL, "Received from client (%zu Bytes) with TLS encryption!",
-        bytes_recv);
+    LOG(DBG, NULL, "Received TLS traffic from client (%zu Bytes)", bytes_recv);
     if (forward(*server_fd, buffer, bytes_recv) == -1) {
       LOG(ERR, NULL, "Couldn't forward bytes to server");
       close(*server_fd);
@@ -137,7 +123,9 @@ int client_handler(const int client_fd, int *server_fd, struct pollfd fds[2],
   }
 
   if (strncmp("CONNECT", req->method, 7) == 0) {
-    const char *response = "HTTP/1.1 200 OK\r\n\r\n";
+    const char *response = "HTTP/1.1 200 Connection Established\r\n"
+                           "Proxy-Agent: HTTProxy/1.0\r\n"
+                           "\r\n";
     if (forward(client_fd, (unsigned char *)response, strlen(response)) == -1) {
       LOG(ERR, NULL, "Couldn't forward bytes to server");
       close(*server_fd);

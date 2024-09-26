@@ -35,7 +35,7 @@ static void print_banner(void) {
 
 static void stop_exec(int sig_num) {
   (void)sig_num;
-  char *msg = "Closing the proxy server...";
+  char *msg = "Closing the proxy server...\n";
   write(STDOUT_FILENO, msg, strlen(msg));
 
   // cancel handler threads before, the proxy server

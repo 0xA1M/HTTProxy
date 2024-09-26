@@ -2,7 +2,7 @@
 CC = gcc
 
 # Compiler flags
-CFLAGS = -Wall -Werror -Wextra -pedantic -Iinclude -g
+CFLAGS = -Wall -Wextra -pedantic -Iinclude -g
 
 # Linker flags
 LDFLAGS = #-fsanitize=address

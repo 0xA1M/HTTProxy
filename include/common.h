@@ -25,6 +25,7 @@
 
 extern pthread_t thread_pool[MAX_THREADS];
 extern int thread_count;
+extern pthread_mutex_t lock;
 
 #define MAX_HTTP_LEN 8192
 #define MAX_PORT_LEN 6 // Max length of the port number

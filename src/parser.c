@@ -57,7 +57,6 @@ static unsigned char *parse_request_line(const unsigned char *raw,
     LOG(ERR, NULL, "Failed to allocate memory to store method");
     return NULL;
   }
-  memset(req->method, 0, method_size);
   memcpy(req->method, raw, method_size);
   req->method[method_size] = '\0';
 
@@ -72,7 +71,6 @@ static unsigned char *parse_request_line(const unsigned char *raw,
     LOG(ERR, NULL, "Failed to allocate memory to store URI");
     return NULL;
   }
-  memset(raw_uri, 0, uri_size);
   memcpy(raw_uri, method_end, uri_size);
   raw_uri[uri_size] = '\0';
 
@@ -95,7 +93,6 @@ static unsigned char *parse_request_line(const unsigned char *raw,
     LOG(ERR, NULL, "Failed to allocate memory to store HTTP version");
     return NULL;
   }
-  memset(req->version, 0, version_size);
   memcpy(req->version, uri_end, version_size);
   req->version[version_size] = '\0';
 
@@ -109,7 +106,6 @@ static int init_header_key(const unsigned char *key, const long key_len,
     LOG(ERR, NULL, "Failed to allocate memory to store key field of a header");
     return -1;
   }
-  memset(req->headers[req->headers_count].key, 0, key_len);
   memcpy(req->headers[req->headers_count].key, key, key_len);
   req->headers[req->headers_count].key[key_len] = '\0';
   return 0;
@@ -123,7 +119,6 @@ static int init_header_value(const unsigned char *value, const long value_len,
         "Failed to allocate memory to store value field of a header");
     return -1;
   }
-  memset(req->headers[req->headers_count].value, 0, value_len);
   memcpy(req->headers[req->headers_count].value, value,
          value_len); // Skip past the : and SP
   req->headers[req->headers_count].value[value_len] = '\0';
@@ -185,7 +180,6 @@ static int parse_body(const unsigned char *body, Request *req) {
       LOG(ERR, NULL, "Failed to allocate memory to store request body");
       return -1;
     }
-    memset(req->body, 0, content_length);
     memcpy(req->body, body, content_length);
     req->body_size = content_length;
     return 0;
@@ -209,7 +203,6 @@ int parse_request(const unsigned char *raw, const long len, Request *req) {
   // Search for the last '\r\n\r\n' indicating the end of the header section
   unsigned char *headers_end = (unsigned char *)memmem(raw, len, "\r\n\r\n", 4);
   if (headers_end == NULL) {
-    // TODO: Return a Invalid Request page
     LOG(ERR, NULL, "Invalid Request");
     return -1;
   }

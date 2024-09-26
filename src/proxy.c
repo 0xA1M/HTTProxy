@@ -70,6 +70,7 @@ static void event_loop(const int proxy_fd) {
 
   int client_fd = -1;
   while (1) {
+    pthread_testcancel();
     client_fd = accept(proxy_fd, (struct sockaddr *)&client_addr, &addr_len);
     if (client_fd == -1) {
       LOG(WARN, NULL, "Failed to accept client connection");
@@ -92,6 +93,7 @@ static void event_loop(const int proxy_fd) {
 
     int slot = find_empty_slot();
     if (slot != -1) {
+      pthread_mutex_lock(&lock);
       if (pthread_create(&thread_pool[slot], NULL, handler, &client_fd) != 0) {
         LOG(WARN, NULL, "Failed to create handler thread for client");
         close(client_fd);
@@ -100,6 +102,7 @@ static void event_loop(const int proxy_fd) {
 
       pthread_detach(thread_pool[slot]);
       thread_count++;
+      pthread_mutex_unlock(&lock);
       continue;
     }
 
@@ -109,13 +112,22 @@ static void event_loop(const int proxy_fd) {
   }
 }
 
+static void cleanup(void *arg) {
+  int proxy_fd = *(int *)arg;
+  if (proxy_fd != -1)
+    close(proxy_fd);
+}
+
 void *proxy(void *arg) {
   int proxy_fd = init_proxy((char *)arg);
   if (proxy_fd == -1)
     return NULL;
 
+  pthread_cleanup_push(cleanup, &proxy_fd);
+
   event_loop(proxy_fd);
 
+  pthread_cleanup_pop(0);
   close(proxy_fd);
   return NULL;
 }

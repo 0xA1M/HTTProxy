@@ -3,6 +3,7 @@
 #include "common.h"
 #include "proxy.h"
 
+pthread_mutex_t lock = PTHREAD_MUTEX_INITIALIZER;
 pthread_t thread_pool[MAX_THREADS] = {0};
 int thread_count = 0;
 
@@ -33,19 +34,18 @@ static void print_banner(void) {
 }
 
 static void stop_exec(int sig_num) {
-  switch (sig_num) {
-  case 0:
-    LOG(INFO, NULL, "Closing the proxy server...");
-    break;
-  default:
-    LOG(INFO, NULL, "SIGINT Detected. Closing the proxy server...");
-  }
+  (void)sig_num;
+  char *msg = "Closing the proxy server...";
+  write(STDOUT_FILENO, msg, strlen(msg));
 
   // cancel handler threads before, the proxy server
+  pthread_mutex_lock(&lock);
   for (int i = MAX_THREADS - 1; i >= 0; i--) {
     if (thread_pool[i] != 0)
       pthread_cancel(thread_pool[i]);
   }
+  pthread_mutex_unlock(&lock);
+  pthread_mutex_destroy(&lock);
 }
 
 static void init_sig_handler(void) {
@@ -72,6 +72,7 @@ int main(int argc, char **argv) {
 
   if (pthread_create(&thread_pool[thread_count++], NULL, proxy, argv[1]) != 0) {
     LOG(ERR, NULL, "Failed to create proxy server thread");
+    pthread_mutex_destroy(&lock);
     return EXIT_FAILURE;
   }
 

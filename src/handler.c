@@ -1,7 +1,14 @@
 #include "handler.h"
 #include "common.h"
 
-int server_handler(const int client_fd, const int server_fd) {
+typedef struct ClientInfo {
+  int client_fd;
+  int server_fd;
+
+  Request *req;
+} ClientInfo;
+
+static int server_handler(const int client_fd, const int server_fd) {
   unsigned char *buffer[MAX_HTTP_LEN] = {0};
   long bytes_recv = recv(server_fd, buffer, MAX_HTTP_LEN - 1, 0);
   if (bytes_recv <= 0)
@@ -13,28 +20,37 @@ int server_handler(const int client_fd, const int server_fd) {
   return 0;
 }
 
+static void cleanup(void *arg) {
+  ClientInfo *info = (ClientInfo *)arg;
+  if (info->client_fd != -1)
+    close(info->client_fd);
+  if (info->server_fd != -1)
+    close(info->server_fd);
+  free_req(info->req);
+}
+
 void *handler(void *arg) {
-  int client_fd = *((int *)arg);
-  int server_fd = -1;
+  ClientInfo info = {*(int *)arg, -1, NULL};
+  bool is_TLS = false;
 
   struct pollfd fds[2] = {0};
 
-  fds[0].fd = client_fd;
+  fds[0].fd = info.client_fd;
   fds[0].events = POLLIN;
 
-  fds[1].fd = server_fd;
+  fds[1].fd = info.server_fd;
   fds[1].events = POLLIN;
 
-  Request *req = (Request *)malloc(sizeof(Request));
-  if (req == NULL) {
+  info.req = (Request *)malloc(sizeof(Request));
+  if (info.req == NULL) {
     LOG(ERR, NULL, "Failed to allocate memory to request struct");
     return NULL;
   }
-  memset(req, 0, sizeof(Request));
+  memset(info.req, 0, sizeof(Request));
 
-  bool is_TLS = false;
+  pthread_cleanup_push(cleanup, &info);
   while (1) {
-    int nfds = server_fd != -1 ? 2 : 1;
+    int nfds = info.server_fd != -1 ? 2 : 1;
     int events = poll(fds, nfds, TIMEOUT);
     if (events <= 0) {
       if (events == -1)
@@ -47,20 +63,24 @@ void *handler(void *arg) {
     }
 
     if (fds[0].revents & POLLIN)
-      if (client_handler(client_fd, &server_fd, fds, req, &is_TLS) == -1)
+      if (client_handler(info.client_fd, &info.server_fd, fds, info.req,
+                         &is_TLS) == -1)
         break;
 
-    if (server_fd != -1 && (fds[1].revents & POLLIN))
-      if (server_handler(client_fd, server_fd) == -1)
+    if (info.server_fd != -1 && (fds[1].revents & POLLIN))
+      if (server_handler(info.client_fd, info.server_fd) == -1)
         break;
+
+    pthread_testcancel();
   }
 
-  free_req(req);
+  free_req(info.req);
 
-  if (server_fd != -1)
-    close(server_fd);
-  close(client_fd);
+  if (info.server_fd != -1)
+    close(info.server_fd);
+  close(info.client_fd);
 
+  pthread_cleanup_pop(0);
   remove_thread(pthread_self());
   return NULL;
 }

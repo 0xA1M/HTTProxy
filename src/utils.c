@@ -2,8 +2,11 @@
 
 /* Thread pool related util func */
 int find_empty_slot(void) {
-  if (thread_count >= MAX_THREADS)
+  pthread_mutex_lock(&lock);
+  if (thread_count >= MAX_THREADS) {
+    pthread_mutex_unlock(&lock);
     return -1;
+  }
 
   bool found = false;
   int i = 1; // thread_pool[0] is reserved for the proxy server
@@ -13,6 +16,7 @@ int find_empty_slot(void) {
       break;
     }
   }
+  pthread_mutex_unlock(&lock);
 
   if (!found)
     return -1;
@@ -20,6 +24,7 @@ int find_empty_slot(void) {
 }
 
 void remove_thread(pthread_t tid) {
+  pthread_mutex_lock(&lock);
   bool found = false;
 
   for (int i = 0; i < MAX_THREADS; i++) {
@@ -32,10 +37,12 @@ void remove_thread(pthread_t tid) {
 
   if (!found) {
     LOG(ERR, NULL, "Thread ID isn't registered!");
+    pthread_mutex_lock(&lock);
     exit(EXIT_FAILURE);
   }
 
   thread_count--;
+  pthread_mutex_unlock(&lock);
 }
 
 /* Recv/Forw */
@@ -93,8 +100,22 @@ void print_req(Request *req) {
   for (size_t i = 0; i < req->headers_count; i++)
     printf("%s: %s\n", req->headers[i].key, req->headers[i].value);
 
-  printf("\n------ Body (%zu Bytes): \n%s\n" STYLE_NO_BOLD, req->body_size,
-         req->body ? (char *)req->body : "No body");
+  printf("\n------ Body (%zu Bytes): \n" STYLE_NO_BOLD, req->body_size);
+  if (req->body == NULL) {
+    printf("No Body!\n");
+  } else {
+    unsigned char *body = (unsigned char *)malloc(req->body_size + 1);
+    if (body == NULL) {
+      LOG(ERR, NULL, "Failed to print request body");
+      printf(STYLE_DIM
+             "\n####################################\n\n" STYLE_NO_DIM);
+      return;
+    }
+    memcpy(body, req->body, req->body_size);
+    body[req->body_size] = '\0';
+    printf("%s\n", body);
+    free(body);
+  }
 
   printf(STYLE_DIM "\n####################################\n\n" STYLE_NO_DIM);
 }

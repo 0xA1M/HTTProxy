@@ -38,7 +38,7 @@ void *handler(void *arg) {
   fds[0].fd = info.client_fd;
   fds[0].events = POLLIN;
 
-  fds[1].fd = info.server_fd;
+  fds[1].fd = -1;
   fds[1].events = POLLIN;
 
   info.req = (Request *)malloc(sizeof(Request));
@@ -74,12 +74,7 @@ void *handler(void *arg) {
     pthread_testcancel();
   }
 
-  free_req(info.req);
-
-  if (info.server_fd != -1)
-    close(info.server_fd);
-  close(info.client_fd);
-
+  cleanup(&info);
   pthread_cleanup_pop(0);
   remove_thread(pthread_self());
   return NULL;

@@ -23,7 +23,7 @@ static int init_proxy(const char *port) {
 
   int proxy_fd = -1, opt = 1;
   for (p = res; p != NULL; p = p->ai_next) {
-    proxy_fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    proxy_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
     if (proxy_fd == -1) {
       LOG(WARN, NULL, "Failed to create proxy server socket (retrying...)");
       continue;
@@ -37,7 +37,7 @@ static int init_proxy(const char *port) {
       return -1;
     }
 
-    if (bind(proxy_fd, res->ai_addr, res->ai_addrlen) == -1) {
+    if (bind(proxy_fd, p->ai_addr, p->ai_addrlen) == -1) {
       LOG(WARN, NULL,
           "Failed to bind proxy server socket to address (retry...)");
       close(proxy_fd);
@@ -93,14 +93,14 @@ static void event_loop(const int proxy_fd) {
 
     int slot = find_empty_slot();
     if (slot != -1) {
-      pthread_mutex_lock(&lock);
       if (pthread_create(&thread_pool[slot], NULL, handler, &client_fd) != 0) {
         LOG(WARN, NULL, "Failed to create handler thread for client");
         close(client_fd);
         continue;
       }
-
       pthread_detach(thread_pool[slot]);
+
+      pthread_mutex_lock(&lock);
       thread_count++;
       pthread_mutex_unlock(&lock);
       continue;
@@ -128,6 +128,6 @@ void *proxy(void *arg) {
   event_loop(proxy_fd);
 
   pthread_cleanup_pop(0);
-  close(proxy_fd);
+  cleanup(&proxy_fd);
   return NULL;
 }

@@ -4,7 +4,7 @@
 #include "handler.h"
 
 static int connect_to_server(const char *host) {
-  if (host == NULL) {
+  if (host == NULL || *host == '\0') {
     LOG(ERR, NULL, "Empty host");
     return -1;
   }
@@ -16,10 +16,18 @@ static int connect_to_server(const char *host) {
   if (delim != NULL) {
     size_t domain_len = delim - host;
     domain = strndup(host, domain_len);
+    if (domain == NULL) {
+      LOG(ERR, NULL, "Failed to allocate memory to store domain");
+      return -1;
+    }
     strncpy(port, delim + 1, MAX_PORT_LEN - 1);
     port[MAX_PORT_LEN - 1] = '\0';
   } else {
     domain = strdup(host);
+    if (domain == NULL) {
+      LOG(ERR, NULL, "Failed to allocate memory to store domain");
+      return -1;
+    }
   }
 
   struct addrinfo hints, *res, *p;
@@ -31,7 +39,7 @@ static int connect_to_server(const char *host) {
   int status = getaddrinfo(domain, port, &hints, &res);
   if (status != 0) {
     LOG(ERR, gai_strerror(status), "getaddrinfo failed");
-    freeaddrinfo(res);
+    // freeaddrinfo(res);
     free(domain);
     return -1;
   }
@@ -93,9 +101,6 @@ int client_handler(const int client_fd, int *server_fd, struct pollfd fds[2],
     LOG(DBG, NULL, "Received TLS traffic from client (%zu Bytes)", bytes_recv);
     if (forward(*server_fd, buffer, bytes_recv) == -1) {
       LOG(ERR, NULL, "Couldn't forward bytes to server");
-      close(*server_fd);
-      *server_fd = -1;
-      fds[1].fd = *server_fd;
       return -1;
     }
     return 0;
@@ -128,9 +133,6 @@ int client_handler(const int client_fd, int *server_fd, struct pollfd fds[2],
                            "\r\n";
     if (forward(client_fd, (unsigned char *)response, strlen(response)) == -1) {
       LOG(ERR, NULL, "Couldn't forward bytes to server");
-      close(*server_fd);
-      *server_fd = -1;
-      fds[1].fd = *server_fd;
       return -1;
     }
     *is_TLS = true;
@@ -139,9 +141,6 @@ int client_handler(const int client_fd, int *server_fd, struct pollfd fds[2],
 
   if (forward(*server_fd, buffer, bytes_recv) == -1) {
     LOG(ERR, NULL, "Couldn't forward bytes to server");
-    close(*server_fd);
-    *server_fd = -1;
-    fds[1].fd = *server_fd;
     return -1;
   }
 

@@ -10,24 +10,21 @@ static int init_proxy(const char *port) {
   struct addrinfo hints, *res, *p;
 
   memset(&hints, 0, sizeof hints);
-  hints.ai_family = AF_INET;
-  hints.ai_socktype = SOCK_STREAM;
-  hints.ai_flags = AI_PASSIVE;
+  hints.ai_family = AF_UNSPEC;     // IPv4 or IPv6
+  hints.ai_socktype = SOCK_STREAM; // TCP
+  hints.ai_flags = AI_PASSIVE;     // Use local ip
 
   int status = getaddrinfo(NULL, port, &hints, &res);
   if (status != 0) {
     LOG(ERR, gai_strerror(status), "getaddrinfo failed");
-    freeaddrinfo(res);
     return -1;
   }
 
   int proxy_fd = -1, opt = 1;
   for (p = res; p != NULL; p = p->ai_next) {
     proxy_fd = socket(p->ai_family, p->ai_socktype, p->ai_protocol);
-    if (proxy_fd == -1) {
-      LOG(WARN, NULL, "Failed to create proxy server socket (retrying...)");
+    if (proxy_fd == -1)
       continue;
-    }
 
     if (setsockopt(proxy_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof opt) ==
         -1) {
@@ -38,8 +35,6 @@ static int init_proxy(const char *port) {
     }
 
     if (bind(proxy_fd, p->ai_addr, p->ai_addrlen) == -1) {
-      LOG(WARN, NULL,
-          "Failed to bind proxy server socket to address (retry...)");
       close(proxy_fd);
       continue;
     }
@@ -84,7 +79,6 @@ static void event_loop(const int proxy_fd) {
       close(client_fd);
       continue;
     }
-
     LOG(INFO, NULL, "New connection from %s:%d", ip, client_addr.sin_port);
 
     // TODO: Implement a client connection queue, in case the # of connection
@@ -128,6 +122,6 @@ void *proxy(void *arg) {
   event_loop(proxy_fd);
 
   pthread_cleanup_pop(0);
-  cleanup(&proxy_fd);
+  close(proxy_fd);
   return NULL;
 }

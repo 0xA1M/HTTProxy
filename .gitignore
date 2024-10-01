@@ -6,3 +6,6 @@ httproxy
 
 # Ignore clangd config
 .clangd
+
+# Ignore valgrind getaddrinfo memory leak
+valgrind.supp

@@ -18,6 +18,7 @@
 #include "clog.h"
 
 /* Parser */
+#include "parser.h"
 
 /* Thread Pool */
 #define MAX_THREADS 64 // Handle 64 simultaneous connections
@@ -26,8 +27,9 @@ extern pthread_t thread_pool[MAX_THREADS];
 extern int thread_count;
 extern pthread_mutex_t lock;
 
-#define MAX_HTTP_LEN 8192
-#define MAX_PORT_LEN 6 // Max length of the port number
+#define MAX_HTTP_LEN 8192    // Max length of the http request/response
+#define MAX_HOSTNAME_LEN 256 // Max length of the hostname
+#define MAX_PORT_LEN 6       // Max length of the port number
 
 /* Utility Functions */
 int find_empty_slot(void);
@@ -35,5 +37,12 @@ int find_empty_slot(void);
 void remove_thread(pthread_t tid);
 
 int forward(const int dest_fd, const unsigned char *buffer, const long len);
+
+void print_req(Request *req);
+
+void free_req(Request *req);
+
+char *get_header_value(char *target, const Header *headers,
+                       const size_t headers_count);
 
 #endif /* COMMON_H */

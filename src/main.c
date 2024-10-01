@@ -1,4 +1,5 @@
 #include <signal.h>
+#include <string.h>
 
 #include "common.h"
 #include "proxy.h"
@@ -35,8 +36,7 @@ static void print_banner(void) {
 
 static void stop_exec(int sig_num) {
   (void)sig_num;
-  char *msg = "Closing the proxy server...\n";
-  write(STDOUT_FILENO, msg, strlen(msg));
+  LOG(INFO, NULL, "Closing the proxy server...");
 
   // cancel handler threads before, the proxy server
   pthread_mutex_lock(&lock);

@@ -13,7 +13,7 @@ This project aims to create a lightweight and scalable HTTP/HTTPS proxy server i
 - [ ] **Chunked Transfer Encoding**: Process HTTP chunked transfers for streaming and large content.
 - [ ] **Binary Data Support**: Handle binary data transfers for non-text content.
 - [ ] **Compression Support**: Implement support for major compression/decompression (gzip/deflate/br) standards in HTTP requests and responses.
-- [ ] **HTTPS Support**: Implement SSL/TLS tunneling for HTTPS traffic using the `CONNECT` method.
+- [x] **HTTPS Support**: Implement SSL/TLS tunneling for HTTPS traffic using the `CONNECT` method.
 
 ### Quality of life features
 

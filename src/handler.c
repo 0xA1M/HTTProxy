@@ -1,10 +1,17 @@
 #include "handler.h"
 #include "common.h"
 
-typedef struct ClientInfo {
-  int client_fd;
-  int server_fd;
-} ClientInfo;
+static int server_handler(const int client_fd, const int server_fd) {
+  unsigned char *buffer[MAX_HTTP_LEN] = {0};
+  long bytes_recv = recv(server_fd, buffer, MAX_HTTP_LEN - 1, 0);
+  if (bytes_recv <= 0)
+    return -1;
+
+  long bytes_send = send(client_fd, buffer, bytes_recv, 0);
+  if (bytes_send < 0)
+    return -1;
+  return 0;
+}
 
 static void cleanup(void *arg) {
   ClientInfo *info = (ClientInfo *)arg;
@@ -12,11 +19,12 @@ static void cleanup(void *arg) {
     close(info->client_fd);
   if (info->server_fd != -1)
     close(info->server_fd);
+  free_req(info->req);
 }
 
 void *handler(void *arg) {
-  ClientInfo info = {*(int *)arg, -1};
-  // bool is_TLS = false;
+  ClientInfo info = {*(int *)arg, -1, NULL};
+  bool is_TLS = false;
 
   struct pollfd fds[2] = {0};
 
@@ -26,6 +34,23 @@ void *handler(void *arg) {
   fds[1].fd = -1;
   fds[1].events = POLLIN;
 
+  info.req = (Request *)malloc(sizeof(Request));
+  if (info.req == NULL) {
+    LOG(ERR, NULL, "Failed to allocate memory to request struct");
+    close(info.client_fd);
+    return NULL;
+  }
+  memset(info.req, 0, sizeof(Request));
+
+  Response *res = (Response *)malloc(sizeof(Response));
+  if (res == NULL) {
+    LOG(ERR, NULL, "Failed to allocate memory to request struct");
+    free(info.req);
+    close(info.client_fd);
+    return NULL;
+  }
+  memset(res, 0, sizeof(Response));
+
   pthread_cleanup_push(cleanup, &info);
   while (1) {
     int nfds = info.server_fd != -1 ? 2 : 1;
@@ -33,23 +58,24 @@ void *handler(void *arg) {
     if (events <= 0) {
       if (events == -1)
         LOG(ERR, NULL, "Failed to poll for events");
-
       if (events == 0)
         LOG(INFO, NULL, "Connection timeout!");
-
       break;
     }
 
     if (fds[0].revents & POLLIN)
-      LOG(DBG, NULL, "Received from client!");
-    break;
+      if (client_handler(info.client_fd, &info.server_fd, fds, info.req,
+                         &is_TLS) == -1)
+        break;
 
     if (info.server_fd != -1 && (fds[1].revents & POLLIN))
-      LOG(DBG, NULL, "Received from server!");
+      if (server_handler(info.client_fd, info.server_fd) == -1)
+        break;
 
     pthread_testcancel();
   }
 
+  cleanup(&info);
   pthread_cleanup_pop(0);
   remove_thread(pthread_self());
   return NULL;

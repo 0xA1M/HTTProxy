@@ -1,5 +1,4 @@
 #include <signal.h>
-#include <string.h>
 
 #include "common.h"
 #include "proxy.h"

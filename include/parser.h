@@ -33,7 +33,7 @@ typedef struct Request {
 
 typedef struct Response {
   char *version;
-  unsigned int status_code;
+  char *status_code;
   char *reason_phrase;
 
   Header headers[MAX_HEADERS];

@@ -98,35 +98,86 @@ static unsigned char *parse_request_line(const unsigned char *raw,
   return version_end + 2; // Skip past the \r\n, the beginning of the headers
 }
 
+static unsigned char *parse_response_line(const unsigned char *raw,
+                                          Response *res) {
+  if (raw == NULL || res == NULL)
+    return NULL;
+
+  unsigned char *version_end =
+      (unsigned char *)memchr(raw, ' ', res->header_size);
+  long version_size = version_end - raw;
+
+  res->version = (char *)malloc(version_size + 1);
+  if (res->version == NULL) {
+    LOG(ERR, NULL, "Failed to allocate memory to store HTTP version");
+    return NULL;
+  }
+  memcpy(res->version, raw, version_size);
+  res->version[version_size] = '\0';
+
+  version_end += 1; // Skip past the SP
+
+  unsigned char *status_code = (unsigned char *)memchr(
+      version_end, ' ', res->header_size - (version_size + 1));
+  long status_code_size = status_code - version_end;
+
+  res->status_code = (char *)malloc(status_code_size + 1);
+  if (res->version == NULL) {
+    LOG(ERR, NULL, "Failed to allocate memory to store status code");
+    return NULL;
+  }
+  memcpy(res->status_code, version_end, status_code_size);
+  res->status_code[status_code_size] = '\0';
+
+  status_code += 1; // Skip past the SP
+
+  unsigned char *reason_phrase = (unsigned char *)memchr(
+      status_code, '\r',
+      res->header_size - (version_size + status_code_size + 2));
+  long reason_phrase_size = reason_phrase - status_code;
+
+  res->reason_phrase = (char *)malloc(reason_phrase_size + 1);
+  if (res->reason_phrase == NULL) {
+    LOG(ERR, NULL, "Failed to allocate memory to store reason phrase");
+    return NULL;
+  }
+  memcpy(res->reason_phrase, status_code, reason_phrase_size);
+  res->reason_phrase[reason_phrase_size] = '\0';
+
+  return reason_phrase + 2; // Skip past the \r\n, the beginning of the headers
+}
+
 static int init_header_key(const unsigned char *key, const long key_len,
-                           Request *req) {
-  req->headers[req->headers_count].key = (char *)malloc(key_len + 1);
-  if (req->headers[req->headers_count].key == NULL) {
+                           Header *headers, const unsigned int headers_count) {
+  headers[headers_count].key = (char *)malloc(key_len + 1);
+  if (headers[headers_count].key == NULL) {
     LOG(ERR, NULL, "Failed to allocate memory to store key field of a header");
     return -1;
   }
-  memcpy(req->headers[req->headers_count].key, key, key_len);
-  req->headers[req->headers_count].key[key_len] = '\0';
+  memcpy(headers[headers_count].key, key, key_len);
+  headers[headers_count].key[key_len] = '\0';
   return 0;
 }
 
 static int init_header_value(const unsigned char *value, const long value_len,
-                             Request *req) {
-  req->headers[req->headers_count].value = (char *)malloc(value_len + 1);
-  if (req->headers[req->headers_count].value == NULL) {
+                             Header *headers,
+                             const unsigned int headers_count) {
+  headers[headers_count].value = (char *)malloc(value_len + 1);
+  if (headers[headers_count].value == NULL) {
     LOG(ERR, NULL,
         "Failed to allocate memory to store value field of a header");
     return -1;
   }
-  memcpy(req->headers[req->headers_count].value, value,
+  memcpy(headers[headers_count].value, value,
          value_len); // Skip past the : and SP
-  req->headers[req->headers_count].value[value_len] = '\0';
+  headers[headers_count].value[value_len] = '\0';
   return 0;
 }
 
 static unsigned char *parse_headers(unsigned char *line,
-                                    unsigned char *headers_end, Request *req) {
-  while (req->headers_count < MAX_HEADERS) {
+                                    unsigned char *headers_end, Header *headers,
+                                    unsigned int *headers_count) {
+  while (*headers_count < MAX_HEADERS) {
     // Find where this particular header ends
     unsigned char *next_line =
         (unsigned char *)memmem(line, headers_end - line, "\r\n", 2);
@@ -143,13 +194,14 @@ static unsigned char *parse_headers(unsigned char *line,
       long key_len = delim - line;
       long value_len = header_len - (key_len + 2); // Account for the : and SP
 
-      if (init_header_key(line, key_len, req) == -1)
+      if (init_header_key(line, key_len, headers, *headers_count) == -1)
         return NULL;
 
-      if (init_header_value(delim + 2, value_len, req) == -1)
+      if (init_header_value(delim + 2, value_len, headers, *headers_count) ==
+          -1)
         return NULL;
 
-      req->headers_count++;
+      (*headers_count)++;
     }
 
     line = next_line + 2; // Skip past the CRLF
@@ -158,7 +210,7 @@ static unsigned char *parse_headers(unsigned char *line,
   return line + 2; // Skip the last CRLF
 }
 
-static int parse_body(const unsigned char *body, Request *req) {
+static int parse_req_body(const unsigned char *body, Request *req) {
   // According to RFC 9110 a request message has an optional message body if
   // one of the following conditions is met:
   // 1. If Content-Length is present, read the exact number of bytes.
@@ -196,6 +248,14 @@ static int parse_body(const unsigned char *body, Request *req) {
   return 0;
 }
 
+// TODO implement body parsing
+static int parse_res_body(const unsigned char *body, Response *res) {
+  (void)body;
+  (void)res;
+
+  return 0;
+}
+
 int parse_request(const unsigned char *raw, const long len, Request *req) {
   memset(req, 0, sizeof(Request));
 
@@ -216,19 +276,44 @@ int parse_request(const unsigned char *raw, const long len, Request *req) {
   if (headers_start == NULL)
     return -1;
 
-  unsigned char *body_start = parse_headers(headers_start, headers_end, req);
+  unsigned char *body_start = parse_headers(headers_start, headers_end,
+                                            req->headers, &req->headers_count);
   if (body_start == NULL)
     return -1;
 
-  if (parse_body(body_start, req) == -1)
+  if (parse_req_body(body_start, req) == -1)
     return -1;
 
   return 0;
 }
 
 int parse_response(const unsigned char *raw, const long len, Response *res) {
-  (void)raw;
-  (void)len;
-  (void)res;
+  memset(res, 0, sizeof(Response));
+
+  // Search for the last '\r\n\r\n' indicating the end of the header section
+  unsigned char *headers_end = (unsigned char *)memmem(raw, len, "\r\n\r\n", 4);
+  if (headers_end == NULL) {
+    LOG(ERR, NULL, "Invalid Request");
+    return -1;
+  }
+  // Move the headers_end past the last '\r\n\r\n'.
+  headers_end += 4;
+
+  // Calculate how many bytes are between the raw pointer and the headers_end
+  // pointer thus determining the header section size of the response
+  res->header_size = headers_end - raw;
+
+  unsigned char *headers_start = parse_response_line(raw, res);
+  if (headers_start == NULL)
+    return -1;
+
+  unsigned char *body_start = parse_headers(headers_start, headers_end,
+                                            res->headers, &res->headers_count);
+  if (body_start == NULL)
+    return -1;
+
+  if (parse_res_body(body_start, res) == -1)
+    return -1;
+
   return 0;
 }

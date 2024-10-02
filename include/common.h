@@ -40,7 +40,11 @@ int forward(const int dest_fd, const unsigned char *buffer, const long len);
 
 void print_req(Request *req);
 
+void print_res(Response *res);
+
 void free_req(Request *req);
+
+void free_res(Response *res);
 
 char *get_header_value(char *target, const Header *headers,
                        const size_t headers_count);

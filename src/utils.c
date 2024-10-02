@@ -78,6 +78,22 @@ void free_req(Request *req) {
   free(req);       // Free the request struct
 }
 
+void free_res(Response *res) {
+  // Free the request line
+  free(res->version);
+  free(res->status_code);
+  free(res->reason_phrase);
+
+  // Free the headers
+  for (size_t i = 0; i < res->headers_count; i++) {
+    free(res->headers[i].key);
+    free(res->headers[i].value);
+  }
+
+  free(res->body); // Free the body
+  free(res);       // Free the response struct
+}
+
 void print_req(Request *req) {
   printf(STYLE_DIM "\n####################################\n\n" STYLE_NO_DIM);
 
@@ -102,6 +118,37 @@ void print_req(Request *req) {
     }
     memcpy(body, req->body, req->body_size);
     body[req->body_size] = '\0';
+    printf("%s\n", body);
+    free(body);
+  }
+
+  printf(STYLE_DIM "\n####################################\n\n" STYLE_NO_DIM);
+}
+
+void print_res(Response *res) {
+  printf(STYLE_DIM "\n####################################\n\n" STYLE_NO_DIM);
+
+  printf(STYLE_BOLD "------ Response Line (Header Size: %u Bytes): \nVersion: "
+                    "%s\nStatus Code: %s\nReason Phrase: %s\n\n",
+         res->header_size, res->version, res->status_code, res->reason_phrase);
+
+  printf("------ Headers: \n");
+  for (size_t i = 0; i < res->headers_count; i++)
+    printf("%s: %s\n", res->headers[i].key, res->headers[i].value);
+
+  printf("\n------ Body (%u Bytes): \n" STYLE_NO_BOLD, res->body_size);
+  if (res->body == NULL) {
+    printf("No Body!\n");
+  } else {
+    unsigned char *body = (unsigned char *)malloc(res->body_size + 1);
+    if (body == NULL) {
+      LOG(ERR, NULL, "Failed to print request body");
+      printf(STYLE_DIM
+             "\n####################################\n\n" STYLE_NO_DIM);
+      return;
+    }
+    memcpy(body, res->body, res->body_size);
+    body[res->body_size] = '\0';
     printf("%s\n", body);
     free(body);
   }

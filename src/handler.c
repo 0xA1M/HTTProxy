@@ -3,10 +3,16 @@
 
 static void cleanup(void *arg) {
   ConnInfo *info = (ConnInfo *)arg;
-  if (info->client_fd != -1)
+  if (info->client_fd != -1) {
     close(info->client_fd);
-  if (info->server_fd != -1)
+    info->client_fd = -1;
+  }
+
+  if (info->server_fd != -1) {
     close(info->server_fd);
+    info->server_fd = -1;
+  }
+
   free_req(info->req);
   free_res(info->res);
 }
@@ -42,6 +48,7 @@ void *handler(void *arg) {
 
   pthread_cleanup_push(cleanup, &info);
   while (1) {
+    pthread_testcancel();
     int nfds = info.server_fd != -1 ? 2 : 1;
     int events = poll(fds, nfds, TIMEOUT);
     if (events <= 0) {
@@ -61,8 +68,6 @@ void *handler(void *arg) {
       if (server_handler(info.client_fd, info.server_fd, info.res, &is_TLS) ==
           -1)
         break;
-
-    pthread_testcancel();
   }
 
   cleanup(&info);

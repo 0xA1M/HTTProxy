@@ -56,6 +56,7 @@ static int establish_connection(const char *host) {
       break; // Connection successfully established
 
     close(server_fd);
+    server_fd = -1;
   }
 
   freeaddrinfo(res);

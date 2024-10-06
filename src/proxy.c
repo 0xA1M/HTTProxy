@@ -36,6 +36,7 @@ static int init_proxy(const char *port) {
 
     if (bind(proxy_fd, p->ai_addr, p->ai_addrlen) == -1) {
       close(proxy_fd);
+      proxy_fd = -1;
       continue;
     }
 
@@ -59,27 +60,49 @@ static int init_proxy(const char *port) {
 }
 
 static void event_loop(const int proxy_fd) {
-  struct sockaddr_in client_addr;
+  struct sockaddr_storage client_addr;
   socklen_t addr_len = sizeof(client_addr);
-  memset(&client_addr, 0, addr_len);
-
   int client_fd = -1;
+
   while (1) {
     pthread_testcancel();
+
+    memset(&client_addr, 0, addr_len);
     client_fd = accept(proxy_fd, (struct sockaddr *)&client_addr, &addr_len);
     if (client_fd == -1) {
       LOG(WARN, NULL, "Failed to accept client connection");
       continue;
     }
 
-    char ip[INET_ADDRSTRLEN] = {0};
-    if (inet_ntop(client_addr.sin_family, &client_addr.sin_addr, ip,
-                  INET_ADDRSTRLEN - 1) == NULL) {
-      LOG(WARN, NULL, "Failed to parse client address");
+    char ip[INET6_ADDRSTRLEN] = {0};
+    if (client_addr.ss_family == AF_INET) {
+      struct sockaddr_in *addr = (struct sockaddr_in *)&client_addr;
+
+      if (inet_ntop(AF_INET, &addr->sin_addr, ip, INET_ADDRSTRLEN) == NULL) {
+        LOG(WARN, NULL, "Failed to parse client address");
+        close(client_fd);
+        client_fd = -1;
+        continue;
+      }
+
+      LOG(INFO, NULL, "New connection from %s:%d", ip, ntohs(addr->sin_port));
+    } else if (client_addr.ss_family == AF_INET6) {
+      struct sockaddr_in6 *addr = (struct sockaddr_in6 *)&client_addr;
+
+      if (inet_ntop(AF_INET6, &addr->sin6_addr, ip, INET6_ADDRSTRLEN) == NULL) {
+        LOG(WARN, NULL, "Failed to parse client address");
+        close(client_fd);
+        client_fd = -1;
+        continue;
+      }
+
+      LOG(INFO, NULL, "New connection from %s:%d", ip, ntohs(addr->sin6_port));
+    } else {
+      LOG(WARN, NULL, "Unknown address family");
       close(client_fd);
+      client_fd = -1;
       continue;
     }
-    LOG(INFO, NULL, "New connection from %s:%d", ip, client_addr.sin_port);
 
     // TODO: Implement a client connection queue, in case the # of connection
     // exceeds the MAX_THREADS, accept those new connection and enqueue them and
@@ -90,6 +113,7 @@ static void event_loop(const int proxy_fd) {
       if (pthread_create(&thread_pool[slot], NULL, handler, &client_fd) != 0) {
         LOG(WARN, NULL, "Failed to create handler thread for client");
         close(client_fd);
+        client_fd = -1;
         continue;
       }
       pthread_detach(thread_pool[slot]);
@@ -103,6 +127,7 @@ static void event_loop(const int proxy_fd) {
     LOG(WARN, NULL,
         "Max number of connection reached! Dropping the connection!");
     close(client_fd);
+    client_fd = -1;
   }
 }
 

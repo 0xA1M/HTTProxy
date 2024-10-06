@@ -3,6 +3,7 @@
 
 int server_handler(const int client_fd, const int server_fd, Response *res,
                    bool *is_TLS) {
+  (void)res;
   unsigned char buffer[MAX_HTTP_LEN] = {0};
   long bytes_recv = recv(server_fd, buffer, MAX_HTTP_LEN - 1, 0);
   if (bytes_recv <= 0) {

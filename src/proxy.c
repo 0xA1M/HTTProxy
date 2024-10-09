@@ -77,7 +77,6 @@ static void event_loop(const int proxy_fd) {
     char ip[INET6_ADDRSTRLEN] = {0};
     if (client_addr.ss_family == AF_INET) {
       struct sockaddr_in *addr = (struct sockaddr_in *)&client_addr;
-
       if (inet_ntop(AF_INET, &addr->sin_addr, ip, INET_ADDRSTRLEN) == NULL) {
         LOG(WARN, NULL, "Failed to parse client address");
         close(client_fd);
@@ -88,7 +87,6 @@ static void event_loop(const int proxy_fd) {
       LOG(INFO, NULL, "New connection from %s:%d", ip, ntohs(addr->sin_port));
     } else if (client_addr.ss_family == AF_INET6) {
       struct sockaddr_in6 *addr = (struct sockaddr_in6 *)&client_addr;
-
       if (inet_ntop(AF_INET6, &addr->sin6_addr, ip, INET6_ADDRSTRLEN) == NULL) {
         LOG(WARN, NULL, "Failed to parse client address");
         close(client_fd);

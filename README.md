@@ -6,7 +6,7 @@ This project aims to create a lightweight and scalable HTTP/HTTPS proxy server i
 
 ### Core Features (TODO List):
 
-- [ ] **HTTP/1.1 Support**: Handle HTTP/1.1 requests, methods, headers, and response codes.
+- [x] **HTTP/1.1 Support**: Handle HTTP/1.1 requests, methods, headers, and response codes.
 - [ ] **Persistent Connections**: Support HTTP/1.1 Keep-Alive for multiple requests over a single connection.
 - [x] **Multithreading**: Handle multiple client connections concurrently for better scalability.
 - [x] **Partial `recv/send`**: Support partial data transfers to efficiently handle large requests/responses.
@@ -18,7 +18,7 @@ This project aims to create a lightweight and scalable HTTP/HTTPS proxy server i
 
 ### Quality of life features
 
-- [ ] **Logging**: Track requests, responses, errors, and connection details for monitoring and debugging via [clog](https://github.com/0xA1M/clog).
+- [x] **Logging**: Track requests, responses, errors, and connection details for monitoring and debugging via [clog](https://github.com/0xA1M/clog).
 - [ ] **Request Throttling**: Limit client request rates to prevent abuse and ensure resource fairness.
 - [ ] **Timeout Management**: Handle connection/request timeouts to prevent resource waste.
 - [ ] **Text-Based User Interface (TUI)**: Real-time console for monitoring server activity and logs.

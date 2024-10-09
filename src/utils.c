@@ -107,7 +107,7 @@ void print_req(Request *req) {
 
   printf("\n------ Body (%u Bytes): \n" STYLE_NO_BOLD, req->body_size);
   if (req->body == NULL) {
-    printf("No Body!\n");
+    printf(STYLE_BOLD "No Body!\n" STYLE_NO_BOLD);
   } else {
     unsigned char *body = (unsigned char *)malloc(req->body_size + 1);
     if (body == NULL) {
@@ -138,7 +138,7 @@ void print_res(Response *res) {
 
   printf("\n------ Body (%u Bytes): \n" STYLE_NO_BOLD, res->body_size);
   if (res->body == NULL) {
-    printf("No Body!\n");
+    printf(STYLE_BOLD "No Body!\n" STYLE_NO_BOLD);
   } else {
     unsigned char *body = (unsigned char *)malloc(res->body_size + 1);
     if (body == NULL) {

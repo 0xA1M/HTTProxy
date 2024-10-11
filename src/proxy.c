@@ -4,7 +4,13 @@
 #include "handler.h"
 #include "proxy.h"
 
-#define BACKLOG 16 // Max members in listening queue
+#define BACKLOG 32 // Max members in listening queue
+
+static void cleanup(void *arg) {
+  int *proxy_fd = (int *)arg;
+  if (*proxy_fd != -1)
+    close(*proxy_fd);
+}
 
 static int init_proxy(const char *port) {
   struct addrinfo hints, *res, *p;
@@ -129,22 +135,15 @@ static void event_loop(const int proxy_fd) {
   }
 }
 
-static void cleanup(void *arg) {
-  int proxy_fd = *(int *)arg;
-  if (proxy_fd != -1)
-    close(proxy_fd);
-}
-
 void *proxy(void *arg) {
   int proxy_fd = init_proxy((char *)arg);
-  if (proxy_fd == -1)
+  if (proxy_fd == -1) // Failed to create proxy server
     return NULL;
-
   pthread_cleanup_push(cleanup, &proxy_fd);
 
   event_loop(proxy_fd);
+  close(proxy_fd);
 
   pthread_cleanup_pop(0);
-  close(proxy_fd);
   return NULL;
 }

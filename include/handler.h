@@ -12,8 +12,7 @@
 
 /* Data Structures */
 typedef struct ConnInfo {
-  int client_fd;
-  int server_fd;
+  struct pollfd fds[2];
 
   Request *req;
   Response *res;
@@ -23,10 +22,8 @@ typedef struct ConnInfo {
 
 void *handler(void *arg);
 
-int client_handler(const int client_fd, int *server_fd, struct pollfd fds[2],
-                   Request *req, bool *is_TLS);
+int client_handler(struct pollfd *fds, Request *req, bool *is_TLS);
 
-int server_handler(const int client_fd, const int server_fd, Response *res,
-                   bool *is_TLS);
+int server_handler(const struct pollfd *fds, Response *res, bool *is_TLS);
 
 #endif /* HANDLER_H */

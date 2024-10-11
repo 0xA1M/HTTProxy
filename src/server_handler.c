@@ -1,11 +1,9 @@
 #include "common.h"
 #include "handler.h"
 
-int server_handler(const int client_fd, const int server_fd, Response *res,
-                   bool *is_TLS) {
-  (void)res;
+int server_handler(const struct pollfd *fds, Response *res, bool *is_TLS) {
   unsigned char buffer[MAX_HTTP_LEN] = {0};
-  long bytes_recv = recv(server_fd, buffer, MAX_HTTP_LEN - 1, 0);
+  long bytes_recv = recv(fds[1].fd, buffer, MAX_HTTP_LEN - 1, 0);
   if (bytes_recv <= 0) {
     if (bytes_recv == -1)
       LOG(ERR, NULL, "Failed to receive from server");
@@ -16,7 +14,7 @@ int server_handler(const int client_fd, const int server_fd, Response *res,
 
   if (*is_TLS) {
     LOG(DBG, NULL, "Received TLS traffic from server (%zu Bytes)", bytes_recv);
-    if (forward(client_fd, buffer, bytes_recv) == -1) {
+    if (forward(fds[0].fd, buffer, bytes_recv) == -1) {
       LOG(ERR, NULL, "Couldn't forward bytes to client");
       return -1;
     }
@@ -26,13 +24,13 @@ int server_handler(const int client_fd, const int server_fd, Response *res,
   LOG(DBG, NULL, "Received from server (%zu Bytes): \n%s\n ", bytes_recv,
       buffer);
 
-  // TODO partial response handling
+  (void)res;
   /* if (parse_response(buffer, bytes_recv, res) == -1)
     return -1;
 
   print_res(res); */
 
-  if (forward(client_fd, buffer, bytes_recv) == -1) {
+  if (forward(fds[0].fd, buffer, bytes_recv) == -1) {
     LOG(ERR, NULL, "Couldn't forward bytes to client");
     return -1;
   }

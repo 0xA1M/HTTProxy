@@ -6,12 +6,13 @@ static char *normalize_uri(const char *uri, const long uri_len,
   if (uri == NULL || is_options) {
     if (is_options)
       return strndup("*", 1);
+
     return strndup("/", 1);
   }
 
   const char *path = (char *)memmem(uri, uri_len, "://", 3);
   if (path != NULL) {
-    path += 3; // Skip past the scheme (http:// or https://)
+    path += 3; // Skip past the schema (http:// or https://)
     path = (char *)memchr(path, '/', uri_len - (path - uri)); // Skip the domain
     if (path == NULL)
       return strndup("/", 1); // No path found, assume root
@@ -21,7 +22,7 @@ static char *normalize_uri(const char *uri, const long uri_len,
 
   // If the URI is malformed or empty, default to "/"
   if (path == NULL || *path == '\0')
-    return strdup("/");
+    return strndup("/", 1);
 
   // Look for fragments ('#') and ignore everything after it
   char *frag = (char *)memchr(path, '#', uri_len - (path - uri));
@@ -241,6 +242,7 @@ static int parse_req_body(const unsigned char *body, Request *req) {
   if (transfer_encoding != NULL &&
       memcmp("chunked", transfer_encoding, 7) == 0) {
     // TODO
+    return 0;
   }
 
   req->body = NULL;

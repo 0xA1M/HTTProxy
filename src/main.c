@@ -1,5 +1,4 @@
 #include <signal.h>
-#include <unistd.h>
 
 #include "common.h"
 #include "proxy.h"
@@ -49,7 +48,6 @@ static void stop_exec(int sig_num) {
       pthread_cancel(thread_pool[i]);
   }
   pthread_mutex_unlock(&lock);
-  pthread_mutex_destroy(&lock);
 }
 
 static void init_sig_handler(void) {
@@ -81,5 +79,6 @@ int main(int argc, char **argv) {
   }
 
   pthread_join(thread_pool[0], NULL);
+  pthread_mutex_destroy(&lock);
   return EXIT_SUCCESS;
 }

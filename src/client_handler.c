@@ -69,10 +69,9 @@ static int establish_connection(const char *host) {
   return server_fd;
 }
 
-int client_handler(const int client_fd, int *server_fd, struct pollfd fds[2],
-                   Request *req, bool *is_TLS) {
+int client_handler(struct pollfd *fds, Request *req, bool *is_TLS) {
   unsigned char buffer[MAX_HTTP_LEN] = {0};
-  long bytes_recv = recv(client_fd, buffer, MAX_HTTP_LEN - 1, 0);
+  long bytes_recv = recv(fds[0].fd, buffer, MAX_HTTP_LEN - 1, 0);
   if (bytes_recv <= 0) {
     if (bytes_recv == -1)
       LOG(ERR, NULL, "Failed to receive from client");
@@ -81,9 +80,9 @@ int client_handler(const int client_fd, int *server_fd, struct pollfd fds[2],
     return -1;
   }
 
-  if (*is_TLS && *server_fd != -1) {
+  if (*is_TLS && fds[1].fd != -1) {
     LOG(DBG, NULL, "Received TLS traffic from client (%zu Bytes)", bytes_recv);
-    if (forward(*server_fd, buffer, bytes_recv) == -1) {
+    if (forward(fds[1].fd, buffer, bytes_recv) == -1) {
       LOG(ERR, NULL, "Couldn't forward bytes to server");
       return -1;
     }
@@ -103,19 +102,17 @@ int client_handler(const int client_fd, int *server_fd, struct pollfd fds[2],
     return -1;
   }
 
-  if (*server_fd == -1) {
-    *server_fd = establish_connection(host);
-    if (*server_fd == -1)
+  if (fds[1].fd == -1) {
+    fds[1].fd = establish_connection(host);
+    if (fds[1].fd == -1)
       return -1;
-
-    fds[1].fd = *server_fd;
   }
 
   if (strncmp("CONNECT", req->method, 7) == 0) {
     const char *response = "HTTP/1.1 200 Connection Established\r\n"
                            "Proxy-Agent: HTTProxy/1.0\r\n"
                            "\r\n";
-    if (forward(client_fd, (unsigned char *)response, strlen(response)) == -1) {
+    if (forward(fds[0].fd, (unsigned char *)response, strlen(response)) == -1) {
       LOG(ERR, NULL, "Couldn't forward bytes to server");
       return -1;
     }
@@ -123,7 +120,7 @@ int client_handler(const int client_fd, int *server_fd, struct pollfd fds[2],
     return 0;
   }
 
-  if (forward(*server_fd, buffer, bytes_recv) == -1) {
+  if (forward(fds[1].fd, buffer, bytes_recv) == -1) {
     LOG(ERR, NULL, "Couldn't forward bytes to server");
     return -1;
   }

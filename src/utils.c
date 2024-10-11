@@ -37,7 +37,7 @@ void remove_thread(pthread_t tid) {
 
   if (!found) {
     LOG(ERR, NULL, "Thread ID isn't registered!");
-    pthread_mutex_lock(&lock);
+    pthread_mutex_unlock(&lock);
     exit(EXIT_FAILURE);
   }
 

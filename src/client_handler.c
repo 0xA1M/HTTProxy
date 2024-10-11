@@ -1,7 +1,23 @@
 #include <arpa/inet.h>
+#include <pthread.h>
 
 #include "common.h"
 #include "handler.h"
+
+typedef struct Server_Info {
+  struct addrinfo *res;
+  int *server_fd;
+} Server_Info;
+
+static void clean(void *arg) {
+  Server_Info *info = (Server_Info *)arg;
+  if (*info->server_fd != -1) {
+    close(*info->server_fd);
+    *info->server_fd = -1;
+  }
+
+  freeaddrinfo(info->res);
+}
 
 static int establish_connection(const char *host) {
   char hostname[MAX_HOSTNAME_LEN] = {0};
@@ -33,7 +49,10 @@ static int establish_connection(const char *host) {
 
   char ip[INET6_ADDRSTRLEN] = {0};
   int server_fd = -1;
+  Server_Info info = {res, &server_fd};
+  pthread_cleanup_push(clean, &info);
   for (p = res; p != NULL; p = p->ai_next) {
+    pthread_testcancel();
     void *addr = NULL;
 
     if (p->ai_family == AF_INET) { // IPv4
@@ -60,6 +79,7 @@ static int establish_connection(const char *host) {
   }
 
   freeaddrinfo(res);
+  pthread_cleanup_pop(0);
   if (p == NULL) {
     LOG(ERR, NULL, "Failed to establish a connection to %s:%s", host, port);
     return -1;

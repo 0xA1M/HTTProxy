@@ -21,14 +21,12 @@ int server_handler(const struct pollfd *fds, Response *res, bool *is_TLS) {
     return 0;
   }
 
-  LOG(DBG, NULL, "Received from server (%zu Bytes): \n%s\n ", bytes_recv,
-      buffer);
+  LOG(DBG, NULL, "Received from server (%zu Bytes): \n ", bytes_recv);
 
-  (void)res;
-  /* if (parse_response(buffer, bytes_recv, res) == -1)
+  if (parse_response(buffer, bytes_recv, res) == -1)
     return -1;
 
-  print_res(res); */
+  print_res(res);
 
   if (forward(fds[0].fd, buffer, bytes_recv) == -1) {
     LOG(ERR, NULL, "Couldn't forward bytes to client");

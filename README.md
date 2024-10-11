@@ -11,7 +11,6 @@ This project aims to create a lightweight and scalable HTTP/HTTPS proxy server i
 - [x] **Multithreading**: Handle multiple client connections concurrently for better scalability.
 - [x] **Partial `recv/send`**: Support partial data transfers to efficiently handle large requests/responses.
 - [ ] **Chunked Transfer Encoding**: Process HTTP chunked transfers for streaming and large content.
-- [ ] **Binary Data Support**: Handle binary data transfers for non-text content.
 - [ ] **Compression Support**: Implement support for major compression/decompression (gzip/deflate/br) standards in HTTP requests and responses.
 - [x] **HTTPS Support**: Implement SSL/TLS tunneling for HTTPS traffic using the `CONNECT` method.
 

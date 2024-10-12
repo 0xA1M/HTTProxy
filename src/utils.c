@@ -97,7 +97,7 @@ void free_res(Response *res) {
 void print_req(Request *req) {
   printf(STYLE_DIM "\n####################################\n\n" STYLE_NO_DIM);
 
-  printf(STYLE_BOLD "------ Request Line (Header Size: %u Bytes): \nMethod: "
+  printf(STYLE_BOLD "------ Request Line (Header Size: %zu Bytes): \nMethod: "
                     "%s\nURI: %s\nVersion: %s\n\n",
          req->header_size, req->method, req->uri, req->version);
 
@@ -105,7 +105,7 @@ void print_req(Request *req) {
   for (size_t i = 0; i < req->headers_count; i++)
     printf("%s: %s\n", req->headers[i].key, req->headers[i].value);
 
-  printf("\n------ Body (%u Bytes): \n" STYLE_NO_BOLD, req->body_size);
+  printf("\n------ Body (%zu Bytes): \n" STYLE_NO_BOLD, req->body_size);
   if (req->body == NULL) {
     printf(STYLE_BOLD "No Body!\n" STYLE_NO_BOLD);
   } else {
@@ -128,7 +128,7 @@ void print_req(Request *req) {
 void print_res(Response *res) {
   printf(STYLE_DIM "\n####################################\n\n" STYLE_NO_DIM);
 
-  printf(STYLE_BOLD "------ Response Line (Header Size: %u Bytes): \nVersion: "
+  printf(STYLE_BOLD "------ Response Line (Header Size: %zu Bytes): \nVersion: "
                     "%s\nStatus Code: %s\nReason Phrase: %s\n\n",
          res->header_size, res->version, res->status_code, res->reason_phrase);
 
@@ -136,7 +136,7 @@ void print_res(Response *res) {
   for (size_t i = 0; i < res->headers_count; i++)
     printf("%s: %s\n", res->headers[i].key, res->headers[i].value);
 
-  printf("\n------ Body (%u Bytes): \n" STYLE_NO_BOLD, res->body_size);
+  printf("\n------ Body (%zu Bytes): \n" STYLE_NO_BOLD, res->body_size);
   if (res->body == NULL) {
     printf(STYLE_BOLD "No Body!\n" STYLE_NO_BOLD);
   } else {
@@ -163,4 +163,35 @@ char *get_header_value(char *target, const Header *headers,
       return headers[i].value;
 
   return NULL;
+}
+
+int get_chunk_size(const unsigned char *chunk, const size_t chunk_len) {
+  unsigned char *size_str_end = memmem(chunk, chunk_len, "\r\n", 2);
+  if (size_str_end == NULL) {
+    LOG(WARN, NULL, "Invalid chunk format!");
+    return -1;
+  }
+
+  size_t size_str_len = size_str_end - chunk;
+  if (size_str_len <= 0) {
+    LOG(WARN, NULL, "Invalid chunk format!");
+    return -1;
+  }
+
+  char *size_str = (char *)malloc(size_str_len + 1);
+  if (size_str == NULL) {
+    LOG(ERR, NULL, "Failed to allocate memory to store chunk size");
+    return -1;
+  }
+  memcpy(size_str, chunk, size_str_len);
+  size_str[size_str_len] = '\0';
+
+  char **endptr = NULL;
+  size_t chunk_size = strtol(size_str, endptr, 16);
+  if (endptr != NULL) {
+    LOG(WARN, NULL, "Invalid chunk format");
+    return -1;
+  }
+
+  return chunk_size;
 }

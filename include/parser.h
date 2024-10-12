@@ -21,14 +21,14 @@ typedef struct Request {
 
   // Headers
   Header headers[MAX_HEADERS];
-  unsigned int headers_count;
+  size_t headers_count;
 
   // Size of the headers and the request line
-  unsigned int header_size;
+  size_t header_size;
 
   // Body (optional)
   unsigned char *body;
-  unsigned int body_size;
+  size_t body_size;
 } Request;
 
 typedef struct Response {
@@ -37,14 +37,14 @@ typedef struct Response {
   char *reason_phrase;
 
   Header headers[MAX_HEADERS];
-  unsigned int headers_count;
+  size_t headers_count;
 
   // Size of the headers and the response line
-  unsigned int header_size;
+  size_t header_size;
 
   // Body
   unsigned char *body;
-  unsigned int body_size;
+  size_t body_size;
 } Response;
 
 int parse_request(const unsigned char *raw, const long len, Request *req);

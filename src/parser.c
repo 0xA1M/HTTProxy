@@ -149,7 +149,7 @@ static unsigned char *parse_response_line(const unsigned char *raw,
 }
 
 static int init_header_key(const unsigned char *key, const long key_len,
-                           Header *headers, const unsigned int headers_count) {
+                           Header *headers, const size_t headers_count) {
   headers[headers_count].key = (char *)malloc(key_len + 1);
   if (headers[headers_count].key == NULL) {
     LOG(ERR, NULL, "Failed to allocate memory to store key field of a header");
@@ -161,8 +161,7 @@ static int init_header_key(const unsigned char *key, const long key_len,
 }
 
 static int init_header_value(const unsigned char *value, const long value_len,
-                             Header *headers,
-                             const unsigned int headers_count) {
+                             Header *headers, const size_t headers_count) {
   headers[headers_count].value = (char *)malloc(value_len + 1);
   if (headers[headers_count].value == NULL) {
     LOG(ERR, NULL,
@@ -177,7 +176,7 @@ static int init_header_value(const unsigned char *value, const long value_len,
 
 static unsigned char *parse_headers(unsigned char *line,
                                     unsigned char *headers_end, Header *headers,
-                                    unsigned int *headers_count) {
+                                    size_t *headers_count) {
   while (*headers_count < MAX_HEADERS) {
     // Find where this particular header ends
     unsigned char *next_line =

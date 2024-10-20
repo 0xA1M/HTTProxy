@@ -76,6 +76,7 @@ void free_req(Request *req) {
 
   free(req->body); // Free the body
   free(req);       // Free the request struct
+  req = NULL;
 }
 
 void free_res(Response *res) {
@@ -92,6 +93,7 @@ void free_res(Response *res) {
 
   free(res->body); // Free the body
   free(res);       // Free the response struct
+  res = NULL;
 }
 
 void print_req(Request *req) {
@@ -105,7 +107,8 @@ void print_req(Request *req) {
   for (size_t i = 0; i < req->headers_count; i++)
     printf("%s: %s\n", req->headers[i].key, req->headers[i].value);
 
-  printf("\n------ Body (%zu Bytes): \n" STYLE_NO_BOLD, req->body_size);
+  printf("\n------ Body (Body Size: %zu Bytes): \n" STYLE_NO_BOLD,
+         req->body_size);
   if (req->body == NULL) {
     printf(STYLE_BOLD "No Body!\n" STYLE_NO_BOLD);
   } else {
@@ -120,6 +123,7 @@ void print_req(Request *req) {
     body[req->body_size] = '\0';
     printf("%s\n", body);
     free(body);
+    body = NULL;
   }
 
   printf(STYLE_DIM "\n####################################\n\n" STYLE_NO_DIM);
@@ -136,7 +140,8 @@ void print_res(Response *res) {
   for (size_t i = 0; i < res->headers_count; i++)
     printf("%s: %s\n", res->headers[i].key, res->headers[i].value);
 
-  printf("\n------ Body (%zu Bytes): \n" STYLE_NO_BOLD, res->body_size);
+  printf("\n------ Body (Body Size: %zu Bytes, chunked %d): \n" STYLE_NO_BOLD,
+         res->body_size, res->is_chunked);
   if (res->body == NULL) {
     printf(STYLE_BOLD "No Body!\n" STYLE_NO_BOLD);
   } else {
@@ -151,6 +156,7 @@ void print_res(Response *res) {
     body[res->body_size] = '\0';
     printf("%s\n", body);
     free(body);
+    body = NULL;
   }
 
   printf(STYLE_DIM "\n####################################\n\n" STYLE_NO_DIM);
@@ -193,5 +199,19 @@ int get_chunk_size(const unsigned char *chunk, const size_t chunk_len) {
     return -1;
   }
 
+  free(size_str);
+  size_str = NULL;
+
   return chunk_size;
+}
+
+void print_hex(const unsigned char *buffer, const size_t buffer_len) {
+  for (size_t i = 0; i < buffer_len; i++) {
+    if (i != 0 && i % 32 == 0)
+      printf("\n");
+
+    printf("%.2X ", buffer[i]);
+  }
+
+  printf("\n");
 }

@@ -51,4 +51,6 @@ char *get_header_value(char *target, const Header *headers,
 
 int get_chunk_size(const unsigned char *chunk, const size_t chunk_len);
 
+void print_hex(const unsigned char *buffer, const size_t buffer_len);
+
 #endif /* COMMON_H */

@@ -1,5 +1,8 @@
 #include "common.h"
 
+#define CRLF 2
+#define CHUNK_SIZE_LEN(size) ((size == 0) ? 1 : 16)
+
 static char *normalize_uri(const char *uri, const long uri_len,
                            const char *method) {
   bool is_options = strncmp("OPTIONS", method, 7) == 0;
@@ -78,9 +81,11 @@ static unsigned char *parse_request_line(const unsigned char *raw,
   req->uri = normalize_uri(raw_uri, uri_size, req->method);
   if (req->uri == NULL) {
     free(raw_uri);
+    raw_uri = NULL;
     return NULL;
   }
   free(raw_uri);
+  raw_uri = NULL;
 
   uri_end += 1; // Skip past the SP
 
@@ -210,12 +215,51 @@ static unsigned char *parse_headers(unsigned char *line,
   return line + 2; // Skip the last CRLF
 }
 
-static int parse_req_body(const unsigned char *body, Request *req) {
-  // According to RFC 9110 a request message has an optional message body if
-  // one of the following conditions is met:
-  // 1. If Content-Length is present, read the exact number of bytes.
-  // 2. If Transfer-Encoding: chunked is present, parse the chunks.
-  // If neither is present, assume there is no body.
+static int parse_req_body(const unsigned char *body, const size_t body_len,
+                          Request *req) {
+  /*
+   * Rules for determining if an HTTP request has a body (RFC 9110):
+   *
+   * 1. Method-specific Rules:
+   *    - Some methods (e.g., POST and PUT) often have a body.
+   *    - Other methods (e.g., GET, HEAD, DELETE, CONNECT) typically don't have
+   * a body.
+   *    - However, any method MAY include a body if properly indicated.
+   *
+   * 2. Content-Length Header:
+   *    - If present, its value indicates the exact length of the body in
+   * octets.
+   *    - A Content-Length header with any value (including 0) indicates a body
+   * is present.
+   *
+   * 3. Transfer-Encoding Header:
+   *    - If present, it indicates a body with chunked encoding.
+   *    - The presence of this header always indicates a body, even if it's
+   * empty.
+   *
+   * 4. Expect: 100-continue Header:
+   *    - If present, it usually indicates that the request has a body.
+   *    - The client will wait for a 100 Continue response before sending the
+   * body.
+   *
+   * 5. Multipart Content-Type:
+   *    - If the Content-Type header indicates a multipart type, a body is
+   * present.
+   *
+   * 6. Order of Precedence:
+   *    1. Transfer-Encoding header
+   *    2. Content-Length header
+   *    3. Method semantics and other headers (e.g., Content-Type, Expect)
+   *
+   * 7. Special Cases:
+   *    - TRACE method MUST NOT include a body.
+   *    - If both Content-Length and Transfer-Encoding are present,
+   * Transfer-Encoding takes precedence.
+   *
+   * Note: In a proxy server implementation, you should be prepared to handle
+   * all these cases, including chunked transfer encoding. Always check headers
+   * to determine if a body is present, regardless of the HTTP method used.
+   */
   char *content_length_str =
       get_header_value("Content-Length", req->headers, req->headers_count);
   if (content_length_str != NULL) {
@@ -226,7 +270,7 @@ static int parse_req_body(const unsigned char *body, Request *req) {
       return 0;
     }
 
-    req->body = (unsigned char *)malloc(content_length + 1);
+    req->body = (unsigned char *)malloc(content_length);
     if (req->body == NULL) {
       LOG(ERR, NULL, "Failed to allocate memory to store request body");
       return -1;
@@ -240,7 +284,33 @@ static int parse_req_body(const unsigned char *body, Request *req) {
       get_header_value("Transfer-Encoding", req->headers, req->headers_count);
   if (transfer_encoding != NULL &&
       memcmp("chunked", transfer_encoding, 7) == 0) {
-    // TODO
+    int chunk_size = get_chunk_size(body, body_len);
+    if (chunk_size == -1)
+      return -1;
+
+    if (chunk_size == 0) {
+      req->body = (unsigned char *)malloc(
+          chunk_size + CHUNK_SIZE_LEN(chunk_size) + CRLF * 2);
+      if (req->body == NULL) {
+        LOG(ERR, NULL, "Failed to allocate memory to store request body");
+        return -1;
+      }
+      memcpy(req->body, body,
+             chunk_size + CHUNK_SIZE_LEN(chunk_size) + CRLF * 2);
+      req->body_size = chunk_size + CHUNK_SIZE_LEN(chunk_size) + CRLF * 2;
+      req->is_chunked = false;
+      return 0;
+    }
+
+    req->body = (unsigned char *)malloc(chunk_size +
+                                        CHUNK_SIZE_LEN(chunk_size) + CRLF * 2);
+    if (req->body == NULL) {
+      LOG(ERR, NULL, "Failed to allocate memory to store request body");
+      return -1;
+    }
+    memcpy(req->body, body, chunk_size + CHUNK_SIZE_LEN(chunk_size) + CRLF * 2);
+    req->body_size = chunk_size + CHUNK_SIZE_LEN(chunk_size) + CRLF * 2;
+    req->is_chunked = true;
     return 0;
   }
 
@@ -249,15 +319,115 @@ static int parse_req_body(const unsigned char *body, Request *req) {
   return 0;
 }
 
-// TODO implement body parsing
-static int parse_res_body(const unsigned char *body, Response *res) {
-  (void)body;
-  (void)res;
+static int parse_res_body(const unsigned char *body, const size_t body_len,
+                          Response *res) {
+  /*
+   * Rules for determining if an HTTP response has a body (RFC 9110):
+   *
+   * 1. Status Code Rules:
+   *    - Responses with status codes 1xx (Informational), 204 (No Content),
+   *      and 304 (Not Modified) MUST NOT include a body.
+   *    - All other status codes indicate the presence of a body, even if it's
+   * empty.
+   *
+   * 2. Content-Length Header:
+   *    - If present, its value indicates the exact length of the body in
+   * octets.
+   *    - A Content-Length header with any value (including 0) indicates a body
+   * is present.
+   *
+   * 3. Transfer-Encoding Header:
+   *    - If present, it indicates a body with chunked encoding.
+   *    - The presence of this header always indicates a body, even if it's
+   * empty.
+   *
+   * 4. Server Closing the Connection:
+   *    - In some cases, the server may indicate the end of the body by closing
+   * the connection.
+   *    - This applies when none of the above conditions are met.
+   *
+   * 5. Special Case for HEAD Requests:
+   *    - Responses to HEAD requests never have a body, even if headers indicate
+   * otherwise.
+   *    - The headers should be the same as if the request was a GET.
+   *
+   * 6. Order of Precedence:
+   *    1. Status Code (for 1xx, 204, 304)
+   *    2. Transfer-Encoding header
+   *    3. Content-Length header
+   *    4. Server closing the connection
+   *
+   * Note: In a proxy server implementation, you should be prepared to handle
+   * all these cases, including chunked transfer encoding and connection
+   * closure.
+   */
+  char *content_length_str =
+      get_header_value("Content-Length", res->headers, res->headers_count);
+  if (content_length_str != NULL) {
+    int content_length = strtol(content_length_str, NULL, 10);
+    if (content_length == 0) {
+      res->body = NULL;
+      res->body_size = 0;
+      return 0;
+    }
 
+    res->body = (unsigned char *)malloc(content_length);
+    if (res->body == NULL) {
+      LOG(ERR, NULL, "Failed to allocate memory to store response body");
+      return -1;
+    }
+    memcpy(res->body, body, content_length);
+    res->body_size = content_length;
+    return 0;
+  }
+
+  char *transfer_encoding =
+      get_header_value("Transfer-Encoding", res->headers, res->headers_count);
+  if (transfer_encoding != NULL &&
+      memcmp("chunked", transfer_encoding, 7) == 0) {
+    int chunk_size = get_chunk_size(body, body_len);
+    if (chunk_size == -1)
+      return -1;
+
+    if (chunk_size == 0) {
+      res->body = (unsigned char *)malloc(
+          chunk_size + CHUNK_SIZE_LEN(chunk_size) + CRLF * 2);
+      if (res->body == NULL) {
+        LOG(ERR, NULL, "Failed to allocate memory to store response body");
+        return -1;
+      }
+      memcpy(res->body, body,
+             chunk_size + CHUNK_SIZE_LEN(chunk_size) + CRLF * 2);
+      res->body_size = chunk_size + CHUNK_SIZE_LEN(chunk_size) + CRLF * 2;
+      res->is_chunked = false;
+      return 0;
+    }
+
+    res->body = (unsigned char *)malloc(chunk_size +
+                                        CHUNK_SIZE_LEN(chunk_size) + CRLF * 2);
+    if (res->body == NULL) {
+      LOG(ERR, NULL, "Failed to allocate memory to store response body");
+      return -1;
+    }
+    memcpy(res->body, body, chunk_size + CHUNK_SIZE_LEN(chunk_size) + CRLF * 2);
+    res->body_size = chunk_size + CHUNK_SIZE_LEN(chunk_size) + CRLF * 2;
+    res->is_chunked = true;
+    return 0;
+  }
+
+  res->body = NULL;
+  res->body_size = 0;
   return 0;
 }
 
 int parse_request(const unsigned char *raw, const long len, Request *req) {
+  if (req->is_chunked) {
+    free(req->body);
+    req->body = NULL;
+
+    return parse_req_body(raw, len, req);
+  }
+
   memset(req, 0, sizeof(Request));
 
   // Search for the last '\r\n\r\n' indicating the end of the header section
@@ -282,13 +452,20 @@ int parse_request(const unsigned char *raw, const long len, Request *req) {
   if (body_start == NULL)
     return -1;
 
-  if (parse_req_body(body_start, req) == -1)
+  if (parse_req_body(body_start, len - req->header_size, req) == -1)
     return -1;
 
   return 0;
 }
 
 int parse_response(const unsigned char *raw, const long len, Response *res) {
+  if (res->is_chunked) {
+    free(res->body);
+    res->body = NULL;
+
+    return parse_res_body(raw, len, res) == -1 ? -1 : 0;
+  }
+
   memset(res, 0, sizeof(Response));
 
   // Search for the last '\r\n\r\n' indicating the end of the header section
@@ -313,7 +490,7 @@ int parse_response(const unsigned char *raw, const long len, Response *res) {
   if (body_start == NULL)
     return -1;
 
-  if (parse_res_body(body_start, res) == -1)
+  if (parse_res_body(body_start, len - res->header_size, res) == -1)
     return -1;
 
   return 0;

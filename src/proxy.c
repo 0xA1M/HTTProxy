@@ -36,6 +36,7 @@ static int init_proxy(const char *port) {
         -1) {
       LOG(ERR, NULL, "Failed to set socket options to allow address reuse");
       freeaddrinfo(res);
+      res = NULL;
       close(proxy_fd);
       return -1;
     }
@@ -50,6 +51,7 @@ static int init_proxy(const char *port) {
   }
 
   freeaddrinfo(res);
+  res = NULL;
   if (p == NULL) {
     LOG(ERR, NULL, "Failed to initiate proxy server");
     return -1;

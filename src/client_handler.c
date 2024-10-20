@@ -1,5 +1,4 @@
 #include <arpa/inet.h>
-#include <pthread.h>
 
 #include "common.h"
 #include "handler.h"
@@ -17,6 +16,7 @@ static void clean(void *arg) {
   }
 
   freeaddrinfo(info->res);
+  info->res = NULL;
 }
 
 static int establish_connection(const char *host) {
@@ -79,13 +79,14 @@ static int establish_connection(const char *host) {
   }
 
   freeaddrinfo(res);
+  res = NULL;
   pthread_cleanup_pop(0);
   if (p == NULL) {
     LOG(ERR, NULL, "Failed to establish a connection to %s:%s", host, port);
     return -1;
   }
 
-  LOG(INFO, NULL, "Connection established!");
+  LOG(INFO, NULL, "Connection to %s:%s has been established!", hostname, port);
   return server_fd;
 }
 

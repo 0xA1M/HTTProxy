@@ -26,6 +26,9 @@ typedef struct Request {
   // Size of the headers and the request line
   size_t header_size;
 
+  // Chunked transfer encoding flag
+  bool is_chunked;
+
   // Body (optional)
   unsigned char *body;
   size_t body_size;
@@ -41,6 +44,9 @@ typedef struct Response {
 
   // Size of the headers and the response line
   size_t header_size;
+
+  // Chunked transfer encoding flag
+  bool is_chunked;
 
   // Body
   unsigned char *body;

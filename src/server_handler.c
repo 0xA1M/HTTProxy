@@ -21,7 +21,7 @@ int server_handler(const struct pollfd *fds, Response *res, bool *is_TLS) {
     return 0;
   }
 
-  LOG(DBG, NULL, "Received from server (%zu Bytes): \n ", bytes_recv);
+  LOG(DBG, NULL, "Received from server (%ld Bytes): ", bytes_recv);
 
   if (parse_response(buffer, bytes_recv, res) == -1)
     return -1;

@@ -23,7 +23,7 @@ int find_empty_slot(void) {
   return i;
 }
 
-void remove_thread(pthread_t tid) {
+void remove_thread(const pthread_t tid) {
   pthread_mutex_lock(&lock);
   bool found = false;
 
@@ -96,7 +96,7 @@ void free_res(Response *res) {
   res = NULL;
 }
 
-void print_req(Request *req) {
+void print_req(const Request *req) {
   printf(STYLE_DIM "\n####################################\n\n" STYLE_NO_DIM);
 
   printf(STYLE_BOLD "------ Request Line (Header Size: %zu Bytes): \nMethod: "
@@ -107,8 +107,8 @@ void print_req(Request *req) {
   for (size_t i = 0; i < req->headers_count; i++)
     printf("%s: %s\n", req->headers[i].key, req->headers[i].value);
 
-  printf("\n------ Body (Body Size: %zu Bytes): \n" STYLE_NO_BOLD,
-         req->body_size);
+  printf("\n------ Body (Body Size: %zu Bytes%s): \n" STYLE_NO_BOLD,
+         req->body_size, req->is_chunked ? ", chunked" : "");
   if (req->body == NULL) {
     printf(STYLE_BOLD "No Body!\n" STYLE_NO_BOLD);
   } else {
@@ -129,7 +129,7 @@ void print_req(Request *req) {
   printf(STYLE_DIM "\n####################################\n\n" STYLE_NO_DIM);
 }
 
-void print_res(Response *res) {
+void print_res(const Response *res) {
   printf(STYLE_DIM "\n####################################\n\n" STYLE_NO_DIM);
 
   printf(STYLE_BOLD "------ Response Line (Header Size: %zu Bytes): \nVersion: "
@@ -140,8 +140,8 @@ void print_res(Response *res) {
   for (size_t i = 0; i < res->headers_count; i++)
     printf("%s: %s\n", res->headers[i].key, res->headers[i].value);
 
-  printf("\n------ Body (Body Size: %zu Bytes, chunked %d): \n" STYLE_NO_BOLD,
-         res->body_size, res->is_chunked);
+  printf("\n------ Body (Body Size: %zu Bytes%s): \n" STYLE_NO_BOLD,
+         res->body_size, res->is_chunked ? ", chunked" : "");
   if (res->body == NULL) {
     printf(STYLE_BOLD "No Body!\n" STYLE_NO_BOLD);
   } else {
@@ -162,7 +162,7 @@ void print_res(Response *res) {
   printf(STYLE_DIM "\n####################################\n\n" STYLE_NO_DIM);
 }
 
-char *get_header_value(char *target, const Header *headers,
+char *get_header_value(const char *target, const Header *headers,
                        const size_t headers_count) {
   for (size_t i = 0; i < headers_count; i++)
     if (strncmp(target, headers[i].key, strlen(target)) == 0)

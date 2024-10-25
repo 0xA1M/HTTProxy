@@ -26,6 +26,10 @@ typedef struct Request {
   // Size of the headers and the request line
   size_t header_size;
 
+  // Partial recv flag
+  bool is_partial;
+  size_t partial_recv_size;
+
   // Chunked transfer encoding flag
   bool is_chunked;
 
@@ -45,6 +49,10 @@ typedef struct Response {
   // Size of the headers and the response line
   size_t header_size;
 
+  // Partial recv flag
+  bool is_partial;
+  size_t partial_recv_size;
+
   // Chunked transfer encoding flag
   bool is_chunked;
 
@@ -53,8 +61,8 @@ typedef struct Response {
   size_t body_size;
 } Response;
 
-int parse_request(const unsigned char *raw, const long len, Request *req);
+int parse_request(const unsigned char *raw, const size_t len, Request *req);
 
-int parse_response(const unsigned char *raw, const long len, Response *res);
+int parse_response(const unsigned char *raw, const size_t len, Response *res);
 
 #endif /* PARSER_H */

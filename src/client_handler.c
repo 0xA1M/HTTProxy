@@ -110,7 +110,7 @@ int client_handler(struct pollfd *fds, Request *req, bool *is_TLS) {
     return 0;
   }
 
-  LOG(DBG, NULL, "Received from client (%zu Bytes): ", bytes_recv);
+  LOG(DBG, NULL, "Received from client (%ld Bytes): ", bytes_recv);
 
   if (parse_request(buffer, bytes_recv, req) == -1)
     return -1;

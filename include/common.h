@@ -34,19 +34,19 @@ extern pthread_mutex_t lock;
 /* Utility Functions */
 int find_empty_slot(void);
 
-void remove_thread(pthread_t tid);
+void remove_thread(const pthread_t tid);
 
 int forward(const int dest_fd, const unsigned char *buffer, const long len);
 
-void print_req(Request *req);
+void print_req(const Request *req);
 
-void print_res(Response *res);
+void print_res(const Response *res);
 
 void free_req(Request *req);
 
 void free_res(Response *res);
 
-char *get_header_value(char *target, const Header *headers,
+char *get_header_value(const char *target, const Header *headers,
                        const size_t headers_count);
 
 int get_chunk_size(const unsigned char *chunk, const size_t chunk_len);

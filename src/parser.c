@@ -128,7 +128,7 @@ static unsigned char *parse_response_line(const unsigned char *raw,
   long status_code_size = status_code - version_end;
 
   res->status_code = (char *)malloc(status_code_size + 1);
-  if (res->version == NULL) {
+  if (res->status_code == NULL) {
     LOG(ERR, NULL, "Failed to allocate memory to store status code");
     return NULL;
   }
@@ -420,7 +420,22 @@ static int parse_res_body(const unsigned char *body, const size_t body_len,
   return 0;
 }
 
-int parse_request(const unsigned char *raw, const long len, Request *req) {
+int parse_request(const unsigned char *raw, const size_t len, Request *req) {
+  if (raw == NULL || req == NULL)
+    return -1;
+
+  if (req->is_partial) {
+    memcpy(req->body + req->partial_recv_size, raw, len);
+
+    req->partial_recv_size += len;
+    if (req->partial_recv_size == req->body_size) {
+      req->is_partial = false;
+      req->partial_recv_size = 0;
+    }
+
+    return 0;
+  }
+
   if (req->is_chunked) {
     free(req->body);
     req->body = NULL;
@@ -455,15 +470,35 @@ int parse_request(const unsigned char *raw, const long len, Request *req) {
   if (parse_req_body(body_start, len - req->header_size, req) == -1)
     return -1;
 
+  if (len < req->body_size && req->is_partial == false) {
+    req->is_partial = true;
+    req->partial_recv_size = len;
+  }
+
   return 0;
 }
 
-int parse_response(const unsigned char *raw, const long len, Response *res) {
+int parse_response(const unsigned char *raw, const size_t len, Response *res) {
+  if (raw == NULL || res == NULL)
+    return -1;
+
+  if (res->is_partial) {
+    memcpy(res->body + res->partial_recv_size, raw, len);
+
+    res->partial_recv_size += len;
+    if (res->partial_recv_size == res->body_size) {
+      res->is_partial = false;
+      res->partial_recv_size = 0;
+    }
+
+    return 0;
+  }
+
   if (res->is_chunked) {
     free(res->body);
     res->body = NULL;
 
-    return parse_res_body(raw, len, res) == -1 ? -1 : 0;
+    return parse_res_body(raw, len, res);
   }
 
   memset(res, 0, sizeof(Response));
@@ -492,6 +527,11 @@ int parse_response(const unsigned char *raw, const long len, Response *res) {
 
   if (parse_res_body(body_start, len - res->header_size, res) == -1)
     return -1;
+
+  if (len < res->body_size && res->is_partial == false) {
+    res->is_partial = true;
+    res->partial_recv_size = len;
+  }
 
   return 0;
 }

@@ -16,10 +16,8 @@ static void cleanup(void *arg) {
     info->fds[1].fd = -1;
   }
 
-  free_req(info->req);
-  info->req = NULL;
-  free_res(info->res);
-  info->res = NULL;
+  free_req(&info->req);
+  free_res(&info->res);
 }
 
 void *handler(void *arg) {

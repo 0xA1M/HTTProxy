@@ -5,7 +5,7 @@
 #include <stdio.h>
 
 /* Constant */
-#define MAX_HEADERS 128
+#define MAX_HEADERS 256
 
 /* Data Structure */
 typedef struct Header {
@@ -33,6 +33,13 @@ typedef struct Request {
   // Chunked transfer encoding flag
   bool is_chunked;
 
+  // Content Type
+  char *content_type;
+  bool is_text;
+
+  // Content Encoding
+  char *content_encoding;
+
   // Body (optional)
   unsigned char *body;
   size_t body_size;
@@ -55,6 +62,13 @@ typedef struct Response {
 
   // Chunked transfer encoding flag
   bool is_chunked;
+
+  // Content Type
+  char *content_type;
+  bool is_text;
+
+  // Content Encoding
+  char *content_encoding;
 
   // Body
   unsigned char *body;

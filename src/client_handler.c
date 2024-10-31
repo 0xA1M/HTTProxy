@@ -112,15 +112,97 @@ int client_handler(struct pollfd *fds, Request *req, bool *is_TLS) {
 
   LOG(DBG, NULL, "Received from client (%ld Bytes): ", bytes_recv);
 
-  if (parse_request(buffer, bytes_recv, req) == -1)
+  if (parse_request(buffer, bytes_recv, req) == -1) {
+    const char *response = "HTTP/1.1 400 Bad Request\r\n\r\n";
+    if (forward(fds[0].fd, (unsigned char *)response, strlen(response)) == -1)
+      LOG(ERR, NULL, "Couldn't forward bytes to server");
+
     return -1;
+  }
 
   print_req(req);
 
-  char *host = get_header_value("Host", req->headers, req->headers_count);
+  const char *host = get_header_value("Host", req->headers, req->headers_count);
   if (host == NULL) {
     LOG(ERR, NULL, "No Host header found, dropping the request!");
     return -1;
+  }
+
+  // TODO: Read the blocked website at program startup from a file
+  if (strncmp("vulnweb.com", host, 11) == 0) {
+    FILE *fp = fopen("./src/pages/blocked.html", "r");
+    if (fp == NULL) {
+      LOG(ERR, NULL, "Couldn't open blocked page file, using default response");
+
+      const char *response = "HTTP/1.1 403 Forbidden\r\n"
+                             "Content-Type: text/html\r\n"
+                             "Content-Length: 25\r\n"
+                             "Proxy-Agent: HTTProxy/1.0\r\n"
+                             "\r\n"
+                             "<h1>Website Blocked!</h1>";
+      if (forward(fds[0].fd, (unsigned char *)response, strlen(response)) ==
+          -1) {
+        LOG(ERR, NULL, "Couldn't forward bytes to server");
+        return -1;
+      }
+      LOG(INFO, "", "Blocked site, connection closed with fallback response!");
+      return -1; // Close the connection
+    }
+
+    // Get the Content-Length
+    fseek(fp, 0, SEEK_END);
+    long content_length = ftell(fp);
+    fseek(fp, 0, SEEK_SET);
+
+    char *buffer = (char *)malloc(content_length + 1);
+    if (buffer == NULL) {
+      LOG(ERR, NULL,
+          "Failed to allocate memory for blocked page, using default "
+          "response");
+      fclose(fp);
+
+      const char *response = "HTTP/1.1 403 Forbidden\r\n"
+                             "Content-Type: text/html\r\n"
+                             "Content-Length: 25\r\n"
+                             "Proxy-Agent: HTTProxy/1.0\r\n"
+                             "\r\n"
+                             "<h1>Website Blocked!</h1>";
+      if (forward(fds[0].fd, (unsigned char *)response, strlen(response)) ==
+          -1) {
+        LOG(ERR, NULL, "Couldn't forward bytes to server");
+        return -1;
+      }
+      LOG(INFO, "", "Blocked site, connection closed with fallback response!");
+      return -1; // Close the connection
+    }
+
+    fread(buffer, 1, content_length, fp);
+    buffer[content_length] = '\0';
+    fclose(fp);
+
+    char response[MAX_HTTP_LEN] = {0};
+    snprintf(response, MAX_HTTP_LEN - 1,
+             "HTTP/1.1 403 Forbidden\r\nContent-Type: text/html; "
+             "charset=UTF-8\r\nContent-Length: %ld\r\nProxy-Agent: "
+             "HTTProxy/1.0\r\n\r\n",
+             content_length);
+
+    if (forward(fds[0].fd, (unsigned char *)response, strlen(response)) == -1) {
+      LOG(ERR, NULL, "Couldn't forward bytes to server");
+      free(buffer);
+      return -1;
+    }
+
+    if (forward(fds[0].fd, (unsigned char *)buffer, content_length) == -1) {
+      LOG(ERR, NULL, "Couldn't forward bytes to server");
+      free(buffer);
+      return -1;
+    }
+
+    free(buffer);
+    LOG(INFO, "",
+        "Blocked site, connection closed after sending blocked page!");
+    return -1; // Close the connection
   }
 
   if (fds[1].fd == -1) {

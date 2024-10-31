@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Website Blocked</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      height: 100%;
+      font-family: Arial, sans-serif;
+      background-color: #ffffff;
+      /* Light mode background */
+      color: #ffffff;
+      /* Default color for text */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+
+    .container {
+      max-width: 600px;
+      padding: 40px;
+      border-radius: 10px;
+      background-color: #ff1744;
+      /* Bright red container background */
+      box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.5);
+    }
+
+    h1 {
+      font-size: 2.8em;
+      color: #ffffff;
+      /* White text for header */
+      margin-bottom: 15px;
+    }
+
+    p {
+      font-size: 1.3em;
+      color: #ffffff;
+      /* White text for paragraphs */
+      margin-bottom: 20px;
+    }
+
+    .error-code {
+      font-size: 1.6em;
+      font-weight: bold;
+      color: #ffccd5;
+      /* Light pink for error code */
+      margin-bottom: 20px;
+    }
+
+    /* Dark mode styles */
+    @media (prefers-color-scheme: dark) {
+
+      html,
+      body {
+        background-color: #121212;
+        /* Dark mode background */
+        color: #ffffff;
+      }
+
+      .container {
+        background-color: #d32f2f;
+        /* Darker red for better contrast in dark mode */
+        box-shadow: 0px 0px 10px rgba(255, 255, 255, 0.5);
+      }
+
+      h1,
+      p {
+        color: #ffffff;
+      }
+
+      .error-code {
+        color: #ff8a80;
+        /* Lighter pink for error code text */
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Access Denied</h1>
+    <p>The website you are trying to access has been blocked by the proxy server.</p>
+    <p class="error-code">Error Code: 403 - Forbidden</p>
+    <p>If you believe this is an error, please contact your network administrator.</p>
+  </div>
+</body>
+
+</html>

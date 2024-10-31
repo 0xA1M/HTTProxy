@@ -18,7 +18,7 @@ typedef struct ConnInfo {
   Response *res;
 } ConnInfo;
 
-#define TIMEOUT 10000 // 10 seconds
+#define TIMEOUT 120000 // 120 seconds
 
 void *handler(void *arg);
 

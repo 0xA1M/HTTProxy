@@ -138,6 +138,13 @@ static void event_loop(const int proxy_fd) {
 }
 
 void *proxy(void *arg) {
+  char *endptr = NULL;
+  const long port = strtol((char *)arg, &endptr, 10);
+  if (endptr == (char *)arg || *endptr != '\0' || port < 0 || port > 65535) {
+    LOG(ERR, NULL, "Invalid port number");
+    return NULL;
+  }
+
   int proxy_fd = init_proxy((char *)arg);
   if (proxy_fd == -1) // Failed to create proxy server
     return NULL;

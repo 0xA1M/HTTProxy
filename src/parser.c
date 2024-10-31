@@ -1,4 +1,5 @@
 #include "common.h"
+#include <string.h>
 
 #define CRLF 2
 #define CHUNK_SIZE_LEN(size) ((size == 0) ? 1 : 16)
@@ -260,27 +261,15 @@ static int parse_req_body(const unsigned char *body, const size_t body_len,
    * all these cases, including chunked transfer encoding. Always check headers
    * to determine if a body is present, regardless of the HTTP method used.
    */
-  char *content_length_str =
-      get_header_value("Content-Length", req->headers, req->headers_count);
-  if (content_length_str != NULL) {
-    int content_length = strtol(content_length_str, NULL, 10);
-    if (content_length == 0) {
-      req->body = NULL;
-      req->body_size = 0;
-      return 0;
-    }
+  req->content_type = (char *)get_header_value("Content-Type", req->headers,
+                                               req->headers_count);
+  if (req->content_type != NULL && strncmp("text", req->content_type, 4) == 0)
+    req->is_text = true;
 
-    req->body = (unsigned char *)malloc(content_length);
-    if (req->body == NULL) {
-      LOG(ERR, NULL, "Failed to allocate memory to store request body");
-      return -1;
-    }
-    memcpy(req->body, body, content_length);
-    req->body_size = content_length;
-    return 0;
-  }
+  req->content_encoding = (char *)get_header_value(
+      "Content-Encoding", req->headers, req->headers_count);
 
-  char *transfer_encoding =
+  const char *transfer_encoding =
       get_header_value("Transfer-Encoding", req->headers, req->headers_count);
   if (transfer_encoding != NULL &&
       memcmp("chunked", transfer_encoding, 7) == 0) {
@@ -311,6 +300,26 @@ static int parse_req_body(const unsigned char *body, const size_t body_len,
     memcpy(req->body, body, chunk_size + CHUNK_SIZE_LEN(chunk_size) + CRLF * 2);
     req->body_size = chunk_size + CHUNK_SIZE_LEN(chunk_size) + CRLF * 2;
     req->is_chunked = true;
+    return 0;
+  }
+
+  const char *content_length_str =
+      get_header_value("Content-Length", req->headers, req->headers_count);
+  if (content_length_str != NULL) {
+    int content_length = strtol(content_length_str, NULL, 10);
+    if (content_length == 0) {
+      req->body = NULL;
+      req->body_size = 0;
+      return 0;
+    }
+
+    req->body = (unsigned char *)malloc(content_length);
+    if (req->body == NULL) {
+      LOG(ERR, NULL, "Failed to allocate memory to store request body");
+      return -1;
+    }
+    memcpy(req->body, body, content_length);
+    req->body_size = content_length;
     return 0;
   }
 
@@ -361,27 +370,15 @@ static int parse_res_body(const unsigned char *body, const size_t body_len,
    * all these cases, including chunked transfer encoding and connection
    * closure.
    */
-  char *content_length_str =
-      get_header_value("Content-Length", res->headers, res->headers_count);
-  if (content_length_str != NULL) {
-    int content_length = strtol(content_length_str, NULL, 10);
-    if (content_length == 0) {
-      res->body = NULL;
-      res->body_size = 0;
-      return 0;
-    }
+  res->content_type = (char *)get_header_value("Content-Type", res->headers,
+                                               res->headers_count);
+  if (res->content_type != NULL && strncmp("text", res->content_type, 4) == 0)
+    res->is_text = true;
 
-    res->body = (unsigned char *)malloc(content_length);
-    if (res->body == NULL) {
-      LOG(ERR, NULL, "Failed to allocate memory to store response body");
-      return -1;
-    }
-    memcpy(res->body, body, content_length);
-    res->body_size = content_length;
-    return 0;
-  }
+  res->content_encoding = (char *)get_header_value(
+      "Content-Encoding", res->headers, res->headers_count);
 
-  char *transfer_encoding =
+  const char *transfer_encoding =
       get_header_value("Transfer-Encoding", res->headers, res->headers_count);
   if (transfer_encoding != NULL &&
       memcmp("chunked", transfer_encoding, 7) == 0) {
@@ -415,6 +412,26 @@ static int parse_res_body(const unsigned char *body, const size_t body_len,
     return 0;
   }
 
+  const char *content_length_str =
+      get_header_value("Content-Length", res->headers, res->headers_count);
+  if (content_length_str != NULL) {
+    int content_length = strtol(content_length_str, NULL, 10);
+    if (content_length == 0) {
+      res->body = NULL;
+      res->body_size = 0;
+      return 0;
+    }
+
+    res->body = (unsigned char *)malloc(content_length);
+    if (res->body == NULL) {
+      LOG(ERR, NULL, "Failed to allocate memory to store response body");
+      return -1;
+    }
+    memcpy(res->body, body, content_length);
+    res->body_size = content_length;
+    return 0;
+  }
+
   res->body = NULL;
   res->body_size = 0;
   return 0;
@@ -427,7 +444,7 @@ int parse_request(const unsigned char *raw, const size_t len, Request *req) {
   if (req->is_partial) {
     memcpy(req->body + req->partial_recv_size, raw, len);
 
-    req->partial_recv_size += len;
+    req->partial_recv_size += len - 1;
     if (req->partial_recv_size == req->body_size) {
       req->is_partial = false;
       req->partial_recv_size = 0;
@@ -470,9 +487,9 @@ int parse_request(const unsigned char *raw, const size_t len, Request *req) {
   if (parse_req_body(body_start, len - req->header_size, req) == -1)
     return -1;
 
-  if (len < req->body_size && req->is_partial == false) {
+  if (len - req->header_size < req->body_size && req->is_partial == false) {
     req->is_partial = true;
-    req->partial_recv_size = len;
+    req->partial_recv_size = len - req->header_size - 1;
   }
 
   return 0;
@@ -485,7 +502,7 @@ int parse_response(const unsigned char *raw, const size_t len, Response *res) {
   if (res->is_partial) {
     memcpy(res->body + res->partial_recv_size, raw, len);
 
-    res->partial_recv_size += len;
+    res->partial_recv_size += len - 1;
     if (res->partial_recv_size == res->body_size) {
       res->is_partial = false;
       res->partial_recv_size = 0;
@@ -528,9 +545,9 @@ int parse_response(const unsigned char *raw, const size_t len, Response *res) {
   if (parse_res_body(body_start, len - res->header_size, res) == -1)
     return -1;
 
-  if (len < res->body_size && res->is_partial == false) {
+  if (len - res->header_size < res->body_size && res->is_partial == false) {
     res->is_partial = true;
-    res->partial_recv_size = len;
+    res->partial_recv_size = len - res->header_size - 1;
   }
 
   return 0;

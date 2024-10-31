@@ -78,7 +78,7 @@ int main(int argc, char **argv) {
     return EXIT_FAILURE;
   }
 
-  pthread_join(thread_pool[0], NULL);
+  pthread_join(thread_pool[PROXY_TID_INDEX], NULL);
   pthread_mutex_destroy(&lock);
   return EXIT_SUCCESS;
 }
